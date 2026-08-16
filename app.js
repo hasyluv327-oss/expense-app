@@ -1147,43 +1147,136 @@ function renderHistory() {
 }
 
 // ── CSV Export ────────────────────────────────────────────────────────────────
+// ── CSV Export Dialog ─────────────────────────────────────────────────────────
 function exportCSV() {
+  const role = me().role;
+
+  // Read current filter values (history page filters; may not exist on dashboard)
+  const stFil  = document.getElementById('filterStatus')?.value  || 'all';
+  const catFil = document.getElementById('filterCategory')?.value || 'all';
+  const monFil = document.getElementById('filterMonth')?.value   || 'all';
+
+  // Build month options
+  const months = [...new Set(expenses.map(e => monthKey(e.submitDate)))].sort().reverse();
+  const monthOptions = ['<option value="all">全期間</option>',
+    ...months.map(m => `<option value="${m}" ${monFil===m?'selected':''}>${m.replace('-','年')}月</option>`)
+  ].join('');
+
+  // Inject CSV dialog into modal
+  document.getElementById('modal').querySelector('.modal').classList.remove('modal-wide');
+  document.getElementById('modalTitle').textContent = 'CSV出力設定';
+  document.getElementById('modalContent').innerHTML = `
+    <div class="csv-dialog">
+      <div class="csv-section">
+        <div class="csv-section-label">対象期間</div>
+        <select id="csvMonth" class="csv-select">${monthOptions}</select>
+      </div>
+      <div class="csv-section">
+        <div class="csv-section-label">ステータス</div>
+        <select id="csvStatus" class="csv-select">
+          <option value="all">全ステータス</option>
+          ${Object.entries(STATUS_LABEL).map(([k,v])=>`<option value="${k}" ${stFil===k?'selected':''}>${v}</option>`).join('')}
+        </select>
+      </div>
+      <div class="csv-section">
+        <div class="csv-section-label">カテゴリ</div>
+        <select id="csvCat" class="csv-select">
+          <option value="all">全カテゴリ</option>
+          ${['交通費','宿泊費','会議費','接待費','消耗品費','通信費','その他'].map(c=>`<option value="${c}" ${catFil===c?'selected':''}>${c}</option>`).join('')}
+        </select>
+      </div>
+      <div class="csv-section">
+        <div class="csv-section-label">出力項目</div>
+        <div class="csv-columns">
+          ${[
+            ['col_date',      '申請日',     true],
+            ['col_usedate',   '使用日',     true],
+            ['col_submitter', '申請者',     true],
+            ['col_dept',      '部署',       true],
+            ['col_cat',       'カテゴリ',   true],
+            ['col_payee',     '支払先',     true],
+            ['col_amount',    '金額',       true],
+            ['col_memo',      '用途',       true],
+            ['col_status',    'ステータス', true],
+            ['col_mgr_name',  '上長承認者', false],
+            ['col_mgr_date',  '上長承認日', false],
+            ['col_fin_name',  '経理確認者', false],
+            ['col_fin_date',  '経理確認日', false],
+            ['col_settled',   '精算日',     false],
+          ].map(([id, label, checked]) => `
+            <label class="csv-col-check">
+              <input type="checkbox" id="${id}" ${checked?'checked':''}> ${label}
+            </label>`).join('')}
+        </div>
+      </div>
+      <div class="csv-preview-row" id="csvPreviewRow"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
+        <button class="btn-secondary" onclick="closeModal()">キャンセル</button>
+        <button class="btn-primary" onclick="doExportCSV()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          CSVをダウンロード
+        </button>
+      </div>
+    </div>
+  `;
+  document.getElementById('modal').classList.remove('hidden');
+
+  // Live preview count
+  function updatePreview() {
+    const mon = document.getElementById('csvMonth').value;
+    const st  = document.getElementById('csvStatus').value;
+    const cat = document.getElementById('csvCat').value;
+    let d = role === 'employee' ? expenses.filter(e => e.submitterId === currentUserId) : expenses;
+    if (mon !== 'all') d = d.filter(e => monthKey(e.submitDate) === mon);
+    if (st  !== 'all') d = d.filter(e => e.status === st);
+    if (cat !== 'all') d = d.filter(e => e.category === cat);
+    document.getElementById('csvPreviewRow').textContent = `対象件数: ${d.length}件`;
+  }
+  ['csvMonth','csvStatus','csvCat'].forEach(id => document.getElementById(id).addEventListener('change', updatePreview));
+  updatePreview();
+}
+
+function doExportCSV() {
   const role   = me().role;
-  const stFil  = document.getElementById('filterStatus').value;
-  const catFil = document.getElementById('filterCategory').value;
-  const monFil = document.getElementById('filterMonth').value;
+  const mon    = document.getElementById('csvMonth').value;
+  const st     = document.getElementById('csvStatus').value;
+  const cat    = document.getElementById('csvCat').value;
 
-  let data = role === 'employee'
-    ? expenses.filter(e => e.submitterId === currentUserId)
-    : expenses;
-  if (stFil  !== 'all') data = data.filter(e => e.status   === stFil);
-  if (catFil !== 'all') data = data.filter(e => e.category === catFil);
-  if (monFil !== 'all') data = data.filter(e => monthKey(e.submitDate) === monFil);
-  data.sort((a, b) => b.submitDate.localeCompare(a.submitDate));
-
-  const rows = [
-    ['申請日', '使用日', '申請者', 'カテゴリ', '支払先', '金額', '用途', 'ステータス', '上長承認者', '上長承認日', '経理確認者', '経理確認日', '精算予定日'],
+  const colDefs = [
+    ['col_date',      '申請日',     e => e.submitDate],
+    ['col_usedate',   '使用日',     e => e.date],
+    ['col_submitter', '申請者',     e => submitterName(e)],
+    ['col_dept',      '部署',       e => (USERS[e.submitterId] || {}).dept || ''],
+    ['col_cat',       'カテゴリ',   e => e.category],
+    ['col_payee',     '支払先',     e => e.payee],
+    ['col_amount',    '金額',       e => e.amount],
+    ['col_memo',      '用途',       e => e.memo],
+    ['col_status',    'ステータス', e => STATUS_LABEL[e.status] || e.status],
+    ['col_mgr_name',  '上長承認者', e => e.history.find(h=>h.action==='manager_approved')?.who || ''],
+    ['col_mgr_date',  '上長承認日', e => e.history.find(h=>h.action==='manager_approved')?.at?.slice(0,10) || ''],
+    ['col_fin_name',  '経理確認者', e => e.history.find(h=>h.action==='finance_approved')?.who || ''],
+    ['col_fin_date',  '経理確認日', e => e.history.find(h=>h.action==='finance_approved')?.at?.slice(0,10) || ''],
+    ['col_settled',   '精算日',     e => e.settledDate || e.history.find(h=>h.action==='settled')?.at?.slice(0,10) || ''],
   ];
-  data.forEach(e => {
-    const mgr  = e.history.find(h => h.action === 'manager_approved');
-    const fin  = e.history.find(h => h.action === 'finance_approved');
-    const set  = e.history.find(h => h.action === 'settled');
-    rows.push([
-      e.submitDate, e.date, submitterName(e), e.category, e.payee, e.amount,
-      e.memo, STATUS_LABEL[e.status] || e.status,
-      mgr?.who || '', mgr?.at?.slice(0,10) || '',
-      fin?.who || '', fin?.at?.slice(0,10) || '',
-      e.settledDate || set?.at?.slice(0,10) || '',
-    ]);
-  });
 
-  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
-  const bom = '﻿';
-  const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' });
+  const activeCols = colDefs.filter(([id]) => document.getElementById(id)?.checked);
+
+  let data = role === 'employee' ? expenses.filter(e => e.submitterId === currentUserId) : expenses;
+  if (mon !== 'all') data = data.filter(e => monthKey(e.submitDate) === mon);
+  if (st  !== 'all') data = data.filter(e => e.status === st);
+  if (cat !== 'all') data = data.filter(e => e.category === cat);
+  data.sort((a,b) => b.submitDate.localeCompare(a.submitDate));
+
+  const rows = [activeCols.map(([,label]) => label)];
+  data.forEach(e => rows.push(activeCols.map(([,, fn]) => fn(e))));
+
+  const csv  = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
-  a.href = url; a.download = `経費精算_${monFil !== 'all' ? monFil : '全期間'}.csv`;
+  a.href = url; a.download = `経費精算_${mon !== 'all' ? mon : '全期間'}.csv`;
   a.click(); URL.revokeObjectURL(url);
+  closeModal();
   showToast('CSVを出力しました ✓', 'success');
 }
 
@@ -1226,11 +1319,11 @@ function openDetail(id) {
 
   // Finance status pipeline
   const PIPELINE = [
-    { key: 'pending',              label: '申請' },
-    { key: 'manager_approved',     label: '上長承認' },
-    { key: 'finance_pending',      label: '経理承認済み' },
-    { key: 'finance_processing',   label: '精算処理待ち' },
-    { key: 'settled',              label: '精算済み' },
+    { key: 'pending',              label: '申請',        tip: '申請者が経費を申請した状態。上長の確認待ちです。' },
+    { key: 'manager_approved',     label: '上長承認',    tip: '上長が内容を確認・承認しました。経理担当の確認待ちです。' },
+    { key: 'finance_pending',      label: '経理確認済み', tip: '経理担当が内容を確認・承認しました。振込・給与反映の処理待ちです。' },
+    { key: 'finance_processing',   label: '精算処理中',  tip: '振込または給与反映の処理を開始しています。支払完了まで少しお待ちください。' },
+    { key: 'settled',              label: '精算済み',    tip: '支払が完了しました。振込または給与への加算が実行されています。' },
   ];
   const ORDER = ['pending','manager_approved','finance_pending','finance_processing','settled'];
   const curIdx = ORDER.indexOf(e.status);
@@ -1239,13 +1332,14 @@ function openDetail(id) {
       <div class="finance-pipeline-label">経理処理フロー</div>
       <div class="finance-pipeline-steps">
         ${PIPELINE.map((p, i) => {
-          const done    = curIdx > i || e.status === p.key;
-          const current = e.status === p.key;
+          const done     = curIdx > i || e.status === p.key;
+          const current  = e.status === p.key;
           const rejected = e.status === 'rejected';
           return `
-            <div class="pipeline-step ${done && !rejected ? 'done' : ''} ${current ? 'current' : ''}">
+            <div class="pipeline-step ${done && !rejected ? 'done' : ''} ${current ? 'current' : ''}" data-tip="${p.tip}">
               <div class="pipeline-dot">${done && !rejected ? '✓' : i+1}</div>
               <div class="pipeline-label">${p.label}</div>
+              ${current ? '<div class="pipeline-tip-box">' + p.tip + '</div>' : ''}
             </div>
             ${i < PIPELINE.length-1 ? `<div class="pipeline-line ${curIdx > i && !rejected ? 'done' : ''}"></div>` : ''}
           `;
@@ -1327,28 +1421,81 @@ function openDetail(id) {
       </div>
     </div>`).join('');
 
+  // Reject note box
+  const rejectBox = rejectEntry ? `
+    <div class="reject-note-box">
+      <div class="reject-note-label">⚠ 差し戻し理由</div>
+      <div class="reject-note-text">${rejectEntry.note}</div>
+    </div>` : '';
+
+  // Receipt panel (right column)
+  let receiptPanel = '';
+  if (e.receiptData) {
+    receiptPanel = `
+      <div class="detail-receipt-panel">
+        <div class="detail-receipt-title">領収書</div>
+        <img src="${e.receiptData}" class="detail-receipt-img" onclick="window.open('${e.receiptData}')" title="クリックで拡大">
+        <div class="detail-receipt-name">${e.receiptName}</div>
+        <div class="detail-receipt-hint">クリックで拡大</div>
+      </div>`;
+  } else if (e.receiptMock) {
+    receiptPanel = `
+      <div class="detail-receipt-panel">
+        <div class="detail-receipt-title">領収書</div>
+        <div class="detail-receipt-mock">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="12" y2="17"/></svg>
+          <div class="detail-receipt-mock-label">領収書あり</div>
+          <div class="detail-receipt-mock-sub">デモデータ（PDF）</div>
+          <div class="detail-receipt-mock-name">領収書_${e.date.replace(/-/g,'')}.pdf</div>
+        </div>
+      </div>`;
+  } else {
+    receiptPanel = `
+      <div class="detail-receipt-panel">
+        <div class="detail-receipt-title">領収書</div>
+        <div class="detail-receipt-none">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#D1D5DB" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <div>領収書なし</div>
+        </div>
+      </div>`;
+  }
+
+  document.getElementById('modal').querySelector('.modal').classList.add('modal-wide');
   document.getElementById('modalContent').innerHTML = `
-    <div class="detail-row"><span class="detail-label">申請日</span><span class="detail-value">${formatDate(e.submitDate)}</span></div>
-    <div class="detail-row"><span class="detail-label">使用日</span><span class="detail-value">${formatDate(e.date)}</span></div>
-    <div class="detail-row"><span class="detail-label">申請者</span><span class="detail-value">${submitterName(e)}</span></div>
-    <div class="detail-row"><span class="detail-label">カテゴリ</span><span class="detail-value">${e.category}</span></div>
-    <div class="detail-row"><span class="detail-label">支払先</span><span class="detail-value">${e.payee}</span></div>
-    <div class="detail-row"><span class="detail-label">金額</span><span class="detail-value" style="font-size:20px;font-weight:700;color:var(--gray-900)">${fmt(e.amount)}</span></div>
-    <div class="detail-row"><span class="detail-label">用途</span><span class="detail-value">${e.memo}</span></div>
-    ${extraHtml}
-    <div class="detail-row"><span class="detail-label">ステータス</span><span class="detail-value">
-      ${statusBadge(e.status)}
-      ${approver ? `<span class="approver-tag" style="margin-left:6px">→ ${approver}</span>` : ''}
-    </span></div>
-    ${rejectEntry ? `<div class="detail-row"><span class="detail-label">差し戻し理由</span><span class="detail-value" style="color:var(--danger)">${rejectEntry.note}</span></div>` : ''}
-    <div style="margin-top:14px"><div class="receipt-sub" style="font-size:12px;font-weight:600;color:var(--gray-500);margin-bottom:6px">領収書</div>${receiptHtml}</div>
-    ${financeHtml}
-    <div class="timeline-section">
-      <div class="timeline-title">承認履歴</div>
-      <div class="timeline">${timelineHtml}${pendingStepsHtml}</div>
-    </div>
-    <div style="text-align:right;margin-top:20px">
-      <button class="btn-secondary" onclick="closeModal()">閉じる</button>
+    <div class="detail-layout">
+      <!-- Left: 申請内容 + タイムライン -->
+      <div class="detail-left">
+        ${rejectBox}
+        <div class="detail-section-title">申請内容</div>
+        <div class="detail-row"><span class="detail-label">申請日</span><span class="detail-value">${formatDate(e.submitDate)}</span></div>
+        <div class="detail-row"><span class="detail-label">使用日</span><span class="detail-value">${formatDate(e.date)}</span></div>
+        <div class="detail-row"><span class="detail-label">申請者</span><span class="detail-value">${submitterName(e)}</span></div>
+        <div class="detail-row"><span class="detail-label">カテゴリ</span><span class="detail-value">${e.category}</span></div>
+        <div class="detail-row"><span class="detail-label">支払先</span><span class="detail-value">${e.payee}</span></div>
+        <div class="detail-row"><span class="detail-label">金額</span><span class="detail-value" style="font-size:22px;font-weight:700;color:var(--gray-900)">${fmt(e.amount)}</span></div>
+        <div class="detail-row"><span class="detail-label">用途</span><span class="detail-value">${e.memo}</span></div>
+        ${extraHtml}
+        <div class="detail-row"><span class="detail-label">ステータス</span><span class="detail-value">
+          ${statusBadge(e.status)}
+          ${approver ? `<span class="approver-tag" style="margin-left:6px">→ ${approver}</span>` : ''}
+        </span></div>
+
+        ${financeHtml}
+
+        <div class="timeline-section">
+          <div class="timeline-title">承認タイムライン</div>
+          <div class="timeline">${timelineHtml}${pendingStepsHtml}</div>
+        </div>
+
+        <div style="text-align:right;margin-top:20px">
+          <button class="btn-secondary" onclick="closeModal()">閉じる</button>
+        </div>
+      </div>
+
+      <!-- Right: 領収書 -->
+      <div class="detail-right">
+        ${receiptPanel}
+      </div>
     </div>
   `;
   document.getElementById('modal').classList.remove('hidden');
@@ -1356,7 +1503,10 @@ function openDetail(id) {
 
 document.getElementById('modalClose').addEventListener('click', closeModal);
 document.getElementById('modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
-function closeModal() { document.getElementById('modal').classList.add('hidden'); }
+function closeModal() {
+  document.getElementById('modal').classList.add('hidden');
+  document.getElementById('modal').querySelector('.modal').classList.remove('modal-wide');
+}
 
 // ── Badge ─────────────────────────────────────────────────────────────────────
 function updateBadge() {
