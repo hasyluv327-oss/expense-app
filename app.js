@@ -342,6 +342,11 @@ const DUMMY = [
 ];
 
 // ── State ────────────────────────────────────────────────────────────────────
+const DATA_VERSION = '6';  // increment when DUMMY data structure changes
+if (localStorage.getItem('ef_data_version') !== DATA_VERSION) {
+  localStorage.removeItem('ef_expenses');
+  localStorage.setItem('ef_data_version', DATA_VERSION);
+}
 let expenses = JSON.parse(localStorage.getItem('ef_expenses') || 'null') || DUMMY;
 let nextId   = Math.max(...expenses.map(e => e.id)) + 1;
 let currentUserId = localStorage.getItem('ef_user') || 'tanaka';
