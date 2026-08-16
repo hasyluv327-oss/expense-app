@@ -1473,10 +1473,10 @@ function openDetail(id) {
     receiptSection = `
       <div class="detail-section">
         <div class="detail-section-title">領収書</div>
-        <div class="detail-receipt-fullwidth" onclick="window.open('${e.receiptData}')">
+        <div class="detail-receipt-fullwidth" onclick="openLightbox('${e.id}')">
           <img src="${e.receiptData}" class="detail-receipt-full-img">
           <div class="detail-receipt-overlay">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
             クリックで拡大
           </div>
         </div>
@@ -1581,6 +1581,19 @@ function showToast(msg, type = '') {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.add('hidden'), 3500);
 }
+
+// ── Lightbox ─────────────────────────────────────────────────────────────────
+function openLightbox(expId) {
+  const e = expenses.find(x => x.id === Number(expId));
+  if (!e || !e.receiptData) return;
+  document.getElementById('lightboxImg').src = e.receiptData;
+  document.getElementById('lightbox').classList.remove('hidden');
+}
+function closeLightbox() {
+  document.getElementById('lightbox').classList.add('hidden');
+  document.getElementById('lightboxImg').src = '';
+}
+document.addEventListener('keydown', ev => { if (ev.key === 'Escape') closeLightbox(); });
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 renderDemoSwitcher();
