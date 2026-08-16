@@ -1586,18 +1586,28 @@ function showToast(msg, type = '') {
 function openLightbox(expId) {
   const e = expenses.find(x => x.id === Number(expId));
   if (!e || !e.receiptData) return;
-  const lb = document.getElementById('lightbox');
-  document.getElementById('lightboxImg').src = e.receiptData;
-  lb.classList.remove('hidden');
-  lb.style.cssText = 'display:flex!important;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;background:rgba(0,0,0,.88);align-items:center;justify-content:center;padding:24px;';
+  // Blob URL方式 — data: URIより確実にブラウザが開ける
+  const [header, b64] = e.receiptData.split(',');
+  const mime = header.match(/:(.*?);/)[1];
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  const blob = new Blob([bytes], { type: mime });
+  const url  = URL.createObjectURL(blob);
+  const w = window.open(url, '_blank');
+  if (!w) {
+    // ポップアップブロックされた場合はページ内に表示
+    const lb = document.getElementById('lightbox');
+    document.getElementById('lightboxImg').src = e.receiptData;
+    lb.style.cssText = 'display:flex!important;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;background:rgba(0,0,0,.88);align-items:center;justify-content:center;padding:24px;';
+  }
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 function closeLightbox() {
   const lb = document.getElementById('lightbox');
   lb.style.cssText = 'display:none!important;';
-  lb.classList.add('hidden');
   document.getElementById('lightboxImg').src = '';
 }
-document.addEventListener('keydown', ev => { if (ev.key === 'Escape') closeLightbox(); });
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 renderDemoSwitcher();
