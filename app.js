@@ -1197,16 +1197,11 @@ function renderHistory() {
 }
 
 // ── Expense List (manager / finance) ─────────────────────────────────────────
-let elSortKey = 'submitDate';
-let elSortAsc = false;
-
 function buildElFilters() {
-  // Months
   const months = [...new Set(expenses.map(e => monthKey(e.submitDate)))].sort().reverse();
   document.getElementById('elMonth').innerHTML =
     '<option value="all">全月</option>' +
     months.map(m => `<option value="${m}">${m.replace('-','年')}月</option>`).join('');
-  // Users
   const users = [...new Set(expenses.map(e => e.submitterId))];
   document.getElementById('elUser').innerHTML =
     '<option value="all">全ユーザー</option>' +
@@ -1216,17 +1211,15 @@ function buildElFilters() {
 function renderExpList() {
   buildElFilters();
 
-  const search  = (document.getElementById('elSearch').value || '').toLowerCase();
-  const monFil  = document.getElementById('elMonth').value;
-  const usrFil  = document.getElementById('elUser').value;
-  const stFil   = document.getElementById('elStatus').value;
-  const catFil  = document.getElementById('elCategory').value;
+  const search = (document.getElementById('elSearch').value || '').toLowerCase();
+  const monFil = document.getElementById('elMonth').value;
+  const usrFil = document.getElementById('elUser').value;
+  const catFil = document.getElementById('elCategory').value;
 
   const APPROVED_STATUSES = ['manager_approved','finance_pending','finance_processing','settled'];
   let filtered = expenses.filter(e => APPROVED_STATUSES.includes(e.status));
   if (monFil !== 'all') filtered = filtered.filter(e => monthKey(e.submitDate) === monFil);
   if (usrFil !== 'all') filtered = filtered.filter(e => e.submitterId === usrFil);
-  if (stFil  !== 'all') filtered = filtered.filter(e => e.status === stFil);
   if (catFil !== 'all') filtered = filtered.filter(e => e.category === catFil);
   if (search) filtered = filtered.filter(e =>
     submitterName(e).toLowerCase().includes(search) ||
@@ -1234,71 +1227,142 @@ function renderExpList() {
     e.memo.toLowerCase().includes(search)
   );
 
-  // Sort
-  filtered.sort((a, b) => {
-    const va = elSortKey === 'amount' ? a.amount : a.submitDate;
-    const vb = elSortKey === 'amount' ? b.amount : b.submitDate;
-    return elSortAsc
-      ? (va < vb ? -1 : va > vb ? 1 : 0)
-      : (va > vb ? -1 : va < vb ? 1 : 0);
-  });
+  // Sort by date desc within groups
+  filtered.sort((a, b) => a.date < b.date ? 1 : -1);
 
+  const total = filtered.reduce((s, e) => s + e.amount, 0);
+  document.getElementById('elTotalAmount').textContent = fmt(total);
   document.getElementById('elCount').textContent = `${filtered.length}件`;
 
-  const role = me().role;
-  const tbody = document.getElementById('elTableBody');
-  const empty = document.getElementById('elEmpty');
+  const empty   = document.getElementById('elEmpty');
+  const listBody = document.getElementById('elListBody');
 
   if (!filtered.length) {
-    tbody.innerHTML = '';
+    listBody.innerHTML = '';
     empty.classList.remove('hidden');
     return;
   }
   empty.classList.add('hidden');
 
-  tbody.innerHTML = filtered.map(e => {
-    const u = USERS[e.submitterId];
-    const dept = u?.dept || '—';
-    const receipt = e.receiptData || e.receiptMock
-      ? `<span class="el-receipt-ok">📄</span>`
-      : `<span class="el-receipt-none">—</span>`;
+  // Group by month → person
+  const byMonth = {};
+  filtered.forEach(e => {
+    const mk = monthKey(e.date);
+    if (!byMonth[mk]) byMonth[mk] = {};
+    const uid = e.submitterId;
+    if (!byMonth[mk][uid]) byMonth[mk][uid] = [];
+    byMonth[mk][uid].push(e);
+  });
 
-    // Action button based on status + role
-    let action = '';
-    if (role === 'finance') {
-      if (e.status === 'manager_approved') {
-        action = `<button class="el-act-btn el-act-approve" onclick="event.stopPropagation();elApprove(${e.id})">経理承認</button>`;
-      } else if (e.status === 'finance_pending') {
-        action = `<button class="el-act-btn el-act-process" onclick="event.stopPropagation();elProcess(${e.id})">処理へ</button>`;
-      } else if (e.status === 'finance_processing') {
-        action = `<button class="el-act-btn el-act-settle" onclick="event.stopPropagation();elSettle(${e.id})">精算済に</button>`;
-      }
-    } else if (role === 'manager' && e.status === 'pending') {
-      action = `<button class="el-act-btn el-act-approve" onclick="event.stopPropagation();elManagerApprove(${e.id})">承認</button>`;
-    }
+  const months = Object.keys(byMonth).sort().reverse();
+
+  listBody.innerHTML = months.map(mk => {
+    const monthTotal = Object.values(byMonth[mk]).flat().reduce((s, e) => s + e.amount, 0);
+    const [y, m] = mk.split('-');
+    const monthLabel = `${y}年${parseInt(m)}月`;
+
+    const personsHtml = Object.keys(byMonth[mk]).map(uid => {
+      const items = byMonth[mk][uid];
+      const personTotal = items.reduce((s, e) => s + e.amount, 0);
+      const u = USERS[uid];
+
+      const rowsHtml = items.map(e => {
+        const catColor = {
+          '交通費': '#0284C7', '宿泊費': '#7C3AED', '会議費': '#059669',
+          '接待費': '#DC2626', '消耗品費': '#D97706', '通信費': '#0D9488', 'その他': '#6B7280'
+        }[e.category] || '#6B7280';
+
+        // Extra detail (route for 交通費, destination for 宿泊費, etc.)
+        const detail = e.extra
+          ? Object.values(e.extra).filter(Boolean).join(' / ')
+          : '';
+
+        const receiptBtn = e.receiptData
+          ? `<button class="el-pdf-btn" onclick="event.stopPropagation();openLightbox(${e.id})">👁 開く</button>`
+          : e.receiptMock
+            ? `<span class="el-pdf-ok">📄 あり</span>`
+            : `<span class="el-pdf-none">—</span>`;
+
+        return `
+          <tr class="el-row" onclick="openDetail(${e.id})">
+            <td><span class="el-cat-badge" style="background:${catColor}20;color:${catColor}">${e.category}</span></td>
+            <td class="el-td-date">${formatDate(e.date)}</td>
+            <td class="el-td-memo">${e.memo}</td>
+            <td class="el-td-payee">${e.payee}${detail ? `<div class="el-td-detail">${detail}</div>` : ''}</td>
+            <td class="el-td-amount amount">${fmt(e.amount)}</td>
+            <td class="el-td-status">${statusBadge(e.status)}</td>
+            <td class="el-td-receipt">${receiptBtn}</td>
+            <td class="el-td-action" onclick="event.stopPropagation()">
+              ${elActionBtn(e)}
+              <button class="el-detail-btn" onclick="openDetail(${e.id})">詳細</button>
+            </td>
+          </tr>`;
+      }).join('');
+
+      return `
+        <div class="el-person-section">
+          <div class="el-person-header" onclick="elTogglePerson(this)">
+            <span class="el-toggle-icon">▼</span>
+            <div class="el-avatar-sm" style="background:${u?.color || '#9CA3AF'}">${u?.initial || '?'}</div>
+            <span class="el-person-name">${u?.name || uid}</span>
+            <span class="el-person-dept">${u?.dept || ''}</span>
+            <span class="el-person-total">${fmt(personTotal)}</span>
+          </div>
+          <div class="el-person-body">
+            <table class="el-table">
+              <thead>
+                <tr>
+                  <th>カテゴリ</th><th>利用日</th><th>件名</th>
+                  <th>支払先 / 経路</th><th>金額</th><th>ステータス</th><th>領収書</th><th>操作</th>
+                </tr>
+              </thead>
+              <tbody>${rowsHtml}</tbody>
+            </table>
+          </div>
+        </div>`;
+    }).join('');
 
     return `
-      <tr class="el-row" onclick="openDetail(${e.id})">
-        <td class="el-td-date">${formatDate(e.submitDate)}</td>
-        <td class="el-td-user">
-          <div class="el-user-cell">
-            <div class="el-avatar" style="background:${u?.color || '#9CA3AF'}">${u?.initial || '?'}</div>
-            <span>${u?.name || e.submitterId}</span>
-          </div>
-        </td>
-        <td class="el-td-dept">${dept}</td>
-        <td><span class="el-cat-tag">${e.category}</span></td>
-        <td class="el-td-payee">${e.payee}</td>
-        <td class="el-td-memo">${e.memo}</td>
-        <td class="el-td-amount amount">${fmt(e.amount)}</td>
-        <td>${statusBadge(e.status)}</td>
-        <td style="text-align:center">${receipt}</td>
-        <td class="el-td-action" onclick="event.stopPropagation()">
-          ${action}
-          <button class="el-detail-btn" onclick="openDetail(${e.id})">詳細</button>
-        </td>
-      </tr>`;
+      <div class="el-month-section">
+        <div class="el-month-header" onclick="elToggleMonth(this)">
+          <span class="el-toggle-icon">▼</span>
+          ${monthLabel}
+          <span class="el-month-total">${fmt(monthTotal)}</span>
+        </div>
+        <div class="el-month-body">${personsHtml}</div>
+      </div>`;
   }).join('');
+}
+
+function elActionBtn(e) {
+  const role = me().role;
+  if (role === 'finance') {
+    if (e.status === 'manager_approved')
+      return `<button class="el-act-btn el-act-approve" onclick="event.stopPropagation();elApprove(${e.id})">経理承認</button>`;
+    if (e.status === 'finance_pending')
+      return `<button class="el-act-btn el-act-process" onclick="event.stopPropagation();elProcess(${e.id})">処理へ</button>`;
+    if (e.status === 'finance_processing')
+      return `<button class="el-act-btn el-act-settle" onclick="event.stopPropagation();elSettle(${e.id})">精算済に</button>`;
+  }
+  if (role === 'manager' && e.status === 'pending')
+    return `<button class="el-act-btn el-act-approve" onclick="event.stopPropagation();elManagerApprove(${e.id})">承認</button>`;
+  return '';
+}
+
+// toggle collapse
+function elToggleMonth(header) {
+  const icon = header.querySelector('.el-toggle-icon');
+  const body = header.nextElementSibling;
+  const collapsed = body.style.display === 'none';
+  body.style.display = collapsed ? '' : 'none';
+  icon.textContent = collapsed ? '▼' : '▶';
+}
+function elTogglePerson(header) {
+  const icon = header.querySelector('.el-toggle-icon');
+  const body = header.nextElementSibling;
+  const collapsed = body.style.display === 'none';
+  body.style.display = collapsed ? '' : 'none';
+  icon.textContent = collapsed ? '▼' : '▶';
 }
 
 // el inline action handlers
@@ -1338,18 +1402,10 @@ function elManagerApprove(id) {
 }
 
 // Wire up filters for explist
-['elSearch','elMonth','elUser','elStatus','elCategory'].forEach(id => {
+['elSearch','elMonth','elUser','elCategory'].forEach(id => {
   const el = document.getElementById(id);
   if (el) el.addEventListener(id === 'elSearch' ? 'input' : 'change', () => {
     if (currentView === 'explist') renderExpList();
-  });
-});
-document.querySelectorAll('.el-table th[data-sort]').forEach(th => {
-  th.addEventListener('click', () => {
-    const key = th.dataset.sort;
-    if (elSortKey === key) elSortAsc = !elSortAsc;
-    else { elSortKey = key; elSortAsc = false; }
-    renderExpList();
   });
 });
 document.getElementById('explistCsvExport').addEventListener('click', exportCSV);

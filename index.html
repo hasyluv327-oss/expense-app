@@ -219,13 +219,6 @@
           <select id="elUser" class="el-select">
             <option value="all">全ユーザー</option>
           </select>
-          <select id="elStatus" class="el-select">
-            <option value="all">全ステータス</option>
-            <option value="manager_approved">経理確認待ち</option>
-            <option value="finance_pending">経理承認済み</option>
-            <option value="finance_processing">精算処理中</option>
-            <option value="settled">精算済み</option>
-          </select>
           <select id="elCategory" class="el-select">
             <option value="all">全カテゴリ</option>
             <option value="交通費">交通費</option>
@@ -236,31 +229,18 @@
             <option value="通信費">通信費</option>
             <option value="その他">その他</option>
           </select>
+        </div>
+        <!-- summary bar -->
+        <div class="el-summary-bar">
+          <span>合計（フィルタ後）</span>
+          <span class="el-summary-amount" id="elTotalAmount">¥0</span>
           <span class="el-count" id="elCount"></span>
         </div>
-        <!-- table -->
-        <div class="el-table-wrap">
-          <table class="el-table">
-            <thead>
-              <tr>
-                <th class="el-th-date" data-sort="submitDate">申請日 <span class="sort-icon">↕</span></th>
-                <th>申請者</th>
-                <th>部署</th>
-                <th>カテゴリ</th>
-                <th>支払先</th>
-                <th class="el-th-memo">内容</th>
-                <th class="el-th-amount" data-sort="amount">金額 <span class="sort-icon">↕</span></th>
-                <th>ステータス</th>
-                <th>領収書</th>
-                <th>操作</th>
-              </tr>
-            </thead>
-            <tbody id="elTableBody"></tbody>
-          </table>
-          <div id="elEmpty" class="el-empty hidden">
-            <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <p>条件に一致する申請がありません</p>
-          </div>
+        <!-- grouped list -->
+        <div id="elListBody"></div>
+        <div id="elEmpty" class="el-empty hidden">
+          <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <p>条件に一致する申請がありません</p>
         </div>
       </div>
 
