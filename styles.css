@@ -973,6 +973,153 @@ textarea { resize: vertical; }
 }
 .lightbox-close:hover { background: var(--gray-100); }
 
+/* ── Expense List ── */
+.el-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.el-search {
+  flex: 1;
+  min-width: 220px;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  background: white;
+  color: var(--gray-700);
+  outline: none;
+  transition: border-color .15s;
+}
+.el-search:focus { border-color: var(--primary); }
+.el-select {
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  background: white;
+  color: var(--gray-700);
+  outline: none;
+  cursor: pointer;
+}
+.el-select:focus { border-color: var(--primary); }
+.el-count {
+  font-size: 12px;
+  color: var(--gray-400);
+  white-space: nowrap;
+  margin-left: auto;
+}
+
+.el-table-wrap {
+  background: white;
+  border: 1px solid var(--gray-200);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+.el-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.el-table thead tr {
+  background: var(--gray-50);
+  border-bottom: 1px solid var(--gray-200);
+}
+.el-table th {
+  padding: 11px 14px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  color: var(--gray-500);
+  white-space: nowrap;
+}
+.el-table th[data-sort] {
+  cursor: pointer;
+  user-select: none;
+}
+.el-table th[data-sort]:hover { color: var(--primary); }
+.sort-icon { font-size: 10px; opacity: .5; }
+.el-row {
+  border-bottom: 1px solid var(--gray-100);
+  cursor: pointer;
+  transition: background .1s;
+}
+.el-row:last-child { border-bottom: none; }
+.el-row:hover { background: var(--gray-50); }
+.el-table td { padding: 12px 14px; vertical-align: middle; }
+
+.el-user-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.el-avatar {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.el-td-date  { white-space: nowrap; color: var(--gray-500); font-size: 12px; }
+.el-td-dept  { font-size: 12px; color: var(--gray-500); }
+.el-td-payee { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.el-td-memo  { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--gray-600); }
+.el-td-amount { font-weight: 700; white-space: nowrap; }
+.el-td-action { white-space: nowrap; }
+.el-cat-tag {
+  font-size: 11px;
+  background: var(--gray-100);
+  color: var(--gray-600);
+  padding: 2px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.el-receipt-ok   { font-size: 15px; }
+.el-receipt-none { color: var(--gray-300); font-size: 13px; }
+
+.el-detail-btn {
+  font-size: 12px;
+  padding: 4px 10px;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  background: white;
+  color: var(--gray-600);
+  cursor: pointer;
+  transition: border-color .15s, color .15s;
+}
+.el-detail-btn:hover { border-color: var(--primary); color: var(--primary); }
+.el-act-btn {
+  font-size: 11px;
+  padding: 4px 9px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: 600;
+  margin-right: 4px;
+}
+.el-act-approve { background: var(--success-light); color: var(--success); }
+.el-act-approve:hover { background: var(--success); color: white; }
+.el-act-process { background: var(--warning-light); color: var(--warning); }
+.el-act-process:hover { background: var(--warning); color: white; }
+.el-act-settle  { background: var(--primary-light); color: var(--primary); }
+.el-act-settle:hover { background: var(--primary); color: white; }
+
+.el-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 60px 20px;
+  color: var(--gray-400);
+}
+.el-empty p { font-size: 14px; }
+
 /* ── Utilities ── */
 .hidden { display: none !important; }
 .amount { font-weight: 600; color: var(--gray-900); }

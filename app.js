@@ -421,9 +421,12 @@ function updateNavVisibility() {
   document.getElementById('navSubmit').classList.toggle('hidden', role !== 'employee');
   // Approval: manager and finance
   document.getElementById('navApproval').classList.toggle('hidden', role === 'employee');
+  // ExpList: manager and finance only
+  document.getElementById('navExpList').classList.toggle('hidden', role === 'employee');
   // If current view is inaccessible, go to dashboard
   if (role !== 'employee' && currentView === 'submit') switchView('dashboard');
   if (role === 'employee' && currentView === 'approval') switchView('dashboard');
+  if (role === 'employee' && currentView === 'explist') switchView('dashboard');
 }
 
 // ── Navigation ───────────────────────────────────────────────────────────────
@@ -442,6 +445,7 @@ function renderView(view) {
   if (view === 'dashboard') renderDashboard();
   if (view === 'approval')  renderApproval();
   if (view === 'history')   renderHistory();
+  if (view === 'explist')   renderExpList();
   updateBadge();
 }
 
@@ -1191,6 +1195,163 @@ function renderHistory() {
       }).join('')
     : '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--gray-400)">該当する申請はありません</td></tr>';
 }
+
+// ── Expense List (manager / finance) ─────────────────────────────────────────
+let elSortKey = 'submitDate';
+let elSortAsc = false;
+
+function buildElFilters() {
+  // Months
+  const months = [...new Set(expenses.map(e => monthKey(e.submitDate)))].sort().reverse();
+  document.getElementById('elMonth').innerHTML =
+    '<option value="all">全月</option>' +
+    months.map(m => `<option value="${m}">${m.replace('-','年')}月</option>`).join('');
+  // Users
+  const users = [...new Set(expenses.map(e => e.submitterId))];
+  document.getElementById('elUser').innerHTML =
+    '<option value="all">全ユーザー</option>' +
+    users.map(uid => `<option value="${uid}">${USERS[uid]?.name || uid}</option>`).join('');
+}
+
+function renderExpList() {
+  buildElFilters();
+
+  const search  = (document.getElementById('elSearch').value || '').toLowerCase();
+  const monFil  = document.getElementById('elMonth').value;
+  const usrFil  = document.getElementById('elUser').value;
+  const stFil   = document.getElementById('elStatus').value;
+  const catFil  = document.getElementById('elCategory').value;
+
+  let filtered = expenses.slice();
+  if (monFil !== 'all') filtered = filtered.filter(e => monthKey(e.submitDate) === monFil);
+  if (usrFil !== 'all') filtered = filtered.filter(e => e.submitterId === usrFil);
+  if (stFil  !== 'all') filtered = filtered.filter(e => e.status === stFil);
+  if (catFil !== 'all') filtered = filtered.filter(e => e.category === catFil);
+  if (search) filtered = filtered.filter(e =>
+    submitterName(e).toLowerCase().includes(search) ||
+    e.payee.toLowerCase().includes(search) ||
+    e.memo.toLowerCase().includes(search)
+  );
+
+  // Sort
+  filtered.sort((a, b) => {
+    const va = elSortKey === 'amount' ? a.amount : a.submitDate;
+    const vb = elSortKey === 'amount' ? b.amount : b.submitDate;
+    return elSortAsc
+      ? (va < vb ? -1 : va > vb ? 1 : 0)
+      : (va > vb ? -1 : va < vb ? 1 : 0);
+  });
+
+  document.getElementById('elCount').textContent = `${filtered.length}件`;
+
+  const role = me().role;
+  const tbody = document.getElementById('elTableBody');
+  const empty = document.getElementById('elEmpty');
+
+  if (!filtered.length) {
+    tbody.innerHTML = '';
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+
+  tbody.innerHTML = filtered.map(e => {
+    const u = USERS[e.submitterId];
+    const dept = u?.dept || '—';
+    const receipt = e.receiptData || e.receiptMock
+      ? `<span class="el-receipt-ok">📄</span>`
+      : `<span class="el-receipt-none">—</span>`;
+
+    // Action button based on status + role
+    let action = '';
+    if (role === 'finance') {
+      if (e.status === 'manager_approved') {
+        action = `<button class="el-act-btn el-act-approve" onclick="event.stopPropagation();elApprove(${e.id})">経理承認</button>`;
+      } else if (e.status === 'finance_pending') {
+        action = `<button class="el-act-btn el-act-process" onclick="event.stopPropagation();elProcess(${e.id})">処理へ</button>`;
+      } else if (e.status === 'finance_processing') {
+        action = `<button class="el-act-btn el-act-settle" onclick="event.stopPropagation();elSettle(${e.id})">精算済に</button>`;
+      }
+    } else if (role === 'manager' && e.status === 'pending') {
+      action = `<button class="el-act-btn el-act-approve" onclick="event.stopPropagation();elManagerApprove(${e.id})">承認</button>`;
+    }
+
+    return `
+      <tr class="el-row" onclick="openDetail(${e.id})">
+        <td class="el-td-date">${formatDate(e.submitDate)}</td>
+        <td class="el-td-user">
+          <div class="el-user-cell">
+            <div class="el-avatar" style="background:${u?.color || '#9CA3AF'}">${u?.initial || '?'}</div>
+            <span>${u?.name || e.submitterId}</span>
+          </div>
+        </td>
+        <td class="el-td-dept">${dept}</td>
+        <td><span class="el-cat-tag">${e.category}</span></td>
+        <td class="el-td-payee">${e.payee}</td>
+        <td class="el-td-memo">${e.memo}</td>
+        <td class="el-td-amount amount">${fmt(e.amount)}</td>
+        <td>${statusBadge(e.status)}</td>
+        <td style="text-align:center">${receipt}</td>
+        <td class="el-td-action" onclick="event.stopPropagation()">
+          ${action}
+          <button class="el-detail-btn" onclick="openDetail(${e.id})">詳細</button>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+// el inline action handlers
+function elApprove(id) {
+  const e = expenses.find(x => x.id === id);
+  if (!e) return;
+  e.status = 'finance_pending';
+  e.history.push({ action: 'finance_approved', who: me().name, at: new Date().toISOString(), note: '' });
+  e.settledDate = '2026-07-25';
+  save(); renderExpList(); updateBadge();
+  showToast('経理承認しました ✓', 'success');
+}
+function elProcess(id) {
+  const e = expenses.find(x => x.id === id);
+  if (!e) return;
+  e.status = 'finance_processing';
+  e.history.push({ action: 'processing', who: me().name, at: new Date().toISOString(), note: '精算処理開始' });
+  save(); renderExpList(); updateBadge();
+  showToast('精算処理へ移行しました ✓', 'success');
+}
+function elSettle(id) {
+  const e = expenses.find(x => x.id === id);
+  if (!e) return;
+  e.status = 'settled';
+  e.settledDate = new Date().toISOString().slice(0,10);
+  e.history.push({ action: 'settled', who: me().name, at: new Date().toISOString(), note: '振込完了' });
+  save(); renderExpList(); updateBadge();
+  showToast('精算済みにしました ✓', 'success');
+}
+function elManagerApprove(id) {
+  const e = expenses.find(x => x.id === id);
+  if (!e) return;
+  e.status = 'manager_approved';
+  e.history.push({ action: 'manager_approved', who: me().name, at: new Date().toISOString(), note: '' });
+  save(); renderExpList(); updateBadge();
+  showToast('上長承認しました ✓', 'success');
+}
+
+// Wire up filters for explist
+['elSearch','elMonth','elUser','elStatus','elCategory'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener(id === 'elSearch' ? 'input' : 'change', () => {
+    if (currentView === 'explist') renderExpList();
+  });
+});
+document.querySelectorAll('.el-table th[data-sort]').forEach(th => {
+  th.addEventListener('click', () => {
+    const key = th.dataset.sort;
+    if (elSortKey === key) elSortAsc = !elSortAsc;
+    else { elSortKey = key; elSortAsc = false; }
+    renderExpList();
+  });
+});
+document.getElementById('explistCsvExport').addEventListener('click', exportCSV);
 
 // ── CSV Export ────────────────────────────────────────────────────────────────
 // ── CSV Export Dialog ─────────────────────────────────────────────────────────
