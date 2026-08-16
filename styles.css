@@ -210,6 +210,9 @@ nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
   gap: 12px;
   margin-bottom: 24px;
 }
+.action-alerts.five-col {
+  grid-template-columns: repeat(5, 1fr);
+}
 .action-card {
   background: white;
   border-radius: var(--radius);
@@ -600,50 +603,84 @@ textarea { resize: vertical; }
 .timeline { display: flex; flex-direction: column; gap: 0; }
 .timeline-item {
   display: flex;
-  gap: 14px;
-  padding-bottom: 16px;
+  gap: 12px;
+  padding-bottom: 10px;
   position: relative;
 }
 .timeline-item:last-child { padding-bottom: 0; }
 .timeline-item::before {
   content: '';
   position: absolute;
-  left: 15px;
-  top: 30px;
+  left: 13px;
+  top: 26px;
   bottom: 0;
   width: 2px;
   background: var(--gray-200);
 }
 .timeline-item:last-child::before { display: none; }
 .timeline-dot {
-  width: 32px; height: 32px;
+  width: 28px; height: 28px;
   border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  font-size: 13px;
+  font-size: 12px;
   flex-shrink: 0;
   z-index: 1;
 }
 .timeline-dot.done     { background: var(--success-light); color: var(--success); }
 .timeline-dot.rejected { background: var(--danger-light);  color: var(--danger); }
-.timeline-dot.pending  { background: var(--gray-100); color: var(--gray-400); border: 2px solid var(--gray-200); }
+.timeline-dot.pending  { background: var(--gray-100); color: var(--gray-400); border: 2px solid var(--gray-200); font-size:10px; }
 .timeline-body { flex: 1; padding-top: 4px; }
-.timeline-action { font-size: 13px; font-weight: 600; color: var(--gray-900); }
-.timeline-who   { font-size: 12px; color: var(--gray-500); }
-.timeline-when  { font-size: 11px; color: var(--gray-400); margin-top: 2px; }
+.timeline-row  { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.timeline-when-inline  { font-size: 12px; font-weight: 600; color: var(--gray-500); min-width: 68px; }
+.timeline-who-inline   { font-size: 13px; font-weight: 600; color: var(--gray-900); }
+.timeline-action-inline{ font-size: 12px; color: var(--gray-500); }
 .timeline-note  { font-size: 12px; color: var(--danger); background: var(--danger-light); border-radius: 4px; padding: 4px 8px; margin-top: 6px; }
 
-/* ── Finance status in modal ── */
-.finance-status-box {
+/* ── Finance pipeline (modal) ── */
+.finance-pipeline {
+  margin-top: 16px;
   background: var(--purple-light);
   border: 1px solid #DDD6FE;
   border-radius: 8px;
-  padding: 12px 16px;
-  margin-top: 16px;
+  padding: 14px 16px;
 }
-.finance-status-label { font-size: 11px; font-weight: 700; color: var(--purple); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 6px; }
-.finance-status-row { display: flex; justify-content: space-between; align-items: center; }
-.finance-status-value { font-size: 15px; font-weight: 700; color: var(--purple); }
-.finance-settled-date { font-size: 12px; color: var(--gray-500); }
+.finance-pipeline-label { font-size: 11px; font-weight: 700; color: var(--purple); text-transform: uppercase; letter-spacing:.05em; margin-bottom: 12px; }
+.finance-pipeline-steps { display: flex; align-items: center; gap: 0; }
+.pipeline-step { display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0; }
+.pipeline-dot {
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--gray-200); color: var(--gray-400);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700;
+}
+.pipeline-step.done .pipeline-dot    { background: var(--success-light); color: var(--success); }
+.pipeline-step.current .pipeline-dot { background: var(--purple); color: white; }
+.pipeline-label { font-size: 9px; color: var(--gray-400); text-align: center; max-width: 56px; line-height: 1.2; margin-top: 2px; }
+.pipeline-step.done .pipeline-label    { color: var(--success); font-weight: 600; }
+.pipeline-step.current .pipeline-label { color: var(--purple); font-weight: 700; }
+.pipeline-line { flex: 1; height: 2px; background: var(--gray-200); margin-bottom: 18px; }
+.pipeline-line.done { background: var(--success); }
+
+/* ── Receipt inline in approval cards ── */
+.card-receipt-img {
+  width: 68px; height: 68px; object-fit: cover;
+  border-radius: 6px; cursor: pointer;
+  border: 1px solid var(--gray-200); flex-shrink: 0;
+}
+.card-receipt-img:hover { opacity: .85; }
+.card-receipt-mock {
+  width: 68px; height: 68px;
+  background: var(--purple-light); border: 1px solid #DDD6FE;
+  border-radius: 6px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 4px; flex-shrink: 0;
+}
+.card-receipt-mock span { font-size: 9px; color: var(--purple); font-weight: 600; }
+.card-receipt-none {
+  width: 68px; height: 68px; font-size: 10px; color: var(--gray-300);
+  border: 1px dashed var(--gray-200); border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  text-align: center; padding: 4px; flex-shrink: 0;
+}
 
 /* ── Toast ── */
 .toast {

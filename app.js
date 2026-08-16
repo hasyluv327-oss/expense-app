@@ -32,8 +32,8 @@ const CATEGORY_EXTRA = {
 const STATUS_LABEL = {
   pending:              '上長承認待ち',
   manager_approved:     '経理確認待ち',
-  finance_pending:      '経理処理待ち',
-  finance_processing:   '処理中',
+  finance_pending:      '経理承認済み',
+  finance_processing:   '精算処理待ち',
   settled:              '精算済み',
   rejected:             '差し戻し',
 };
@@ -456,31 +456,40 @@ function renderDashboard() {
       </div>
     `;
   } else if (role === 'finance') {
-    const waitFinance  = expenses.filter(e => e.status === 'manager_approved');
-    const inProcess    = expenses.filter(e => ['finance_pending','finance_processing'].includes(e.status));
-    const rejected     = expenses.filter(e => e.status === 'rejected');
-    const unprocAmt    = waitFinance.reduce((s,e)=>s+e.amount,0) + inProcess.reduce((s,e)=>s+e.amount,0);
+    const waitFinance   = expenses.filter(e => e.status === 'manager_approved');
+    const finApproved   = expenses.filter(e => e.status === 'finance_pending');
+    const processing    = expenses.filter(e => e.status === 'finance_processing');
+    const rejected      = expenses.filter(e => e.status === 'rejected');
+    const settledMonth  = allMonth.filter(e => e.status === 'settled');
+    const settledAmt    = settledMonth.reduce((s,e)=>s+e.amount,0);
+    const scheduledAmt  = finApproved.reduce((s,e)=>s+e.amount,0) + processing.reduce((s,e)=>s+e.amount,0);
     alerts.classList.remove('hidden');
+    alerts.classList.add('five-col');
     alerts.innerHTML = `
       <div class="action-card urgent">
         <div class="action-card-label">経理確認待ち</div>
         <div class="action-card-value">${waitFinance.length}件</div>
-        <div class="action-card-sub">要対応</div>
+        <div class="action-card-sub">${fmt(waitFinance.reduce((s,e)=>s+e.amount,0))}</div>
       </div>
       <div class="action-card warn">
-        <div class="action-card-label">未処理金額</div>
-        <div class="action-card-value">${fmt(unprocAmt)}</div>
-        <div class="action-card-sub">確認待ち＋処理中</div>
+        <div class="action-card-label">今日の対応</div>
+        <div class="action-card-value">${waitFinance.length + processing.length}件</div>
+        <div class="action-card-sub">確認＋処理中</div>
       </div>
       <div class="action-card">
         <div class="action-card-label">差し戻し中</div>
         <div class="action-card-value">${rejected.length}件</div>
         <div class="action-card-sub">再申請待ち</div>
       </div>
+      <div class="action-card" style="border-top-color:var(--purple)">
+        <div class="action-card-label">今月精算予定</div>
+        <div class="action-card-value" style="font-size:18px">${fmt(scheduledAmt)}</div>
+        <div class="action-card-sub">${finApproved.length + processing.length}件</div>
+      </div>
       <div class="action-card ok">
-        <div class="action-card-label">今月の精算済み</div>
-        <div class="action-card-value">${allMonth.filter(e=>e.status==='settled').length}件</div>
-        <div class="action-card-sub">${fmt(allMonth.filter(e=>e.status==='settled').reduce((s,e)=>s+e.amount,0))}</div>
+        <div class="action-card-label">今月処理済み</div>
+        <div class="action-card-value">${settledMonth.length}件</div>
+        <div class="action-card-sub">${fmt(settledAmt)}</div>
       </div>
     `;
   } else {
@@ -779,8 +788,43 @@ function renderApprovalCards(list, showActions, role) {
   return list.map(e => {
     const rejectEntry = e.history.find(h => h.action === 'rejected');
     const approver = currentApproverText(e);
+
+    // Receipt inline (finance role)
+    let receiptInline = '';
+    if (role === 'finance') {
+      if (e.receiptData) {
+        receiptInline = `<img src="${e.receiptData}" class="card-receipt-img" onclick="event.stopPropagation();window.open('${e.receiptData}')" title="クリックで拡大">`;
+      } else if (e.receiptMock) {
+        receiptInline = `
+          <div class="card-receipt-mock">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            <span>領収書あり</span>
+          </div>`;
+      } else {
+        receiptInline = `<div class="card-receipt-none">領収書なし</div>`;
+      }
+    }
+
+    // Finance action buttons
+    let financeActions = '';
+    if (role === 'finance') {
+      if (showActions && e.status === 'manager_approved') {
+        financeActions = `
+          <button class="btn-success" onclick="approveExpense(${e.id})">経理承認</button>
+          <button class="btn-danger"  onclick="openRejectModal(${e.id})">差し戻し</button>`;
+      } else if (e.status === 'finance_pending') {
+        financeActions = `<button class="btn-warn" onclick="markProcessing(${e.id})">精算処理へ</button>`;
+      } else if (e.status === 'finance_processing') {
+        financeActions = `<button class="btn-success" onclick="markSettled(${e.id})">精算済みにする</button>`;
+      }
+    } else if (showActions) {
+      financeActions = `
+        <button class="btn-success" onclick="approveExpense(${e.id})">承認</button>
+        <button class="btn-danger"  onclick="openRejectModal(${e.id})">差し戻し</button>`;
+    }
+
     return `
-    <div class="approval-card">
+    <div class="approval-card ${role === 'finance' ? 'approval-card-finance' : ''}">
       <div class="approval-card-top">
         <div class="approval-card-info">
           <div class="approval-card-title">${e.memo}</div>
@@ -793,21 +837,16 @@ function renderApprovalCards(list, showActions, role) {
           ${approver && showActions ? `<div style="margin-top:6px"><span class="approver-tag">現在: ${approver}</span></div>` : ''}
           ${rejectEntry ? `<div class="reject-reason-box">差し戻し理由: ${rejectEntry.note}</div>` : ''}
         </div>
-        <div class="approval-card-right">
-          <div class="approval-card-amount">${fmt(e.amount)}</div>
-          <div style="margin-top:6px">${statusBadge(e.status)}</div>
+        <div style="display:flex;align-items:flex-start;gap:14px">
+          ${receiptInline}
+          <div class="approval-card-right">
+            <div class="approval-card-amount">${fmt(e.amount)}</div>
+            <div style="margin-top:6px">${statusBadge(e.status)}</div>
+          </div>
         </div>
       </div>
       <div class="approval-actions">
-        ${showActions ? `
-          <button class="btn-success" onclick="approveExpense(${e.id})">承認</button>
-          <button class="btn-danger"  onclick="openRejectModal(${e.id})">差し戻し</button>
-          ${role === 'finance' && e.status !== 'manager_approved' ? `
-            <button class="btn-warn" onclick="markSettled(${e.id})">精算済みにする</button>
-          ` : ''}
-        ` : role === 'finance' && ['finance_pending','finance_processing'].includes(e.status) ? `
-          <button class="btn-warn" onclick="markSettled(${e.id})">精算済みにする</button>
-        ` : ''}
+        ${financeActions}
         <button class="btn-sm" onclick="openDetail(${e.id})">詳細 / 履歴</button>
       </div>
     </div>`;
@@ -824,18 +863,31 @@ function approveExpense(id) {
     e.history.push({ action: 'manager_approved', who: me().name, at: new Date().toISOString(), note: '' });
     showToast('上長承認しました ✓', 'success');
   } else {
+    // finance: 経理確認待ち → 経理承認済み
     e.status = 'finance_pending';
     e.history.push({ action: 'finance_approved', who: me().name, at: new Date().toISOString(), note: '' });
     e.settledDate = '2026-07-25';
-    showToast('経理確認完了 → 経理処理待ちに移行しました ✓', 'success');
+    showToast('経理承認しました → 精算処理待ちへ ✓', 'success');
   }
   save(); renderApproval(); updateBadge();
+}
+
+function markProcessing(id) {
+  const e = expenses.find(x => x.id === id);
+  if (!e) return;
+  // 経理承認済み → 精算処理待ち
+  e.status = 'finance_processing';
+  e.history.push({ action: 'processing', who: me().name, at: new Date().toISOString(), note: '精算処理開始' });
+  save(); renderApproval(); updateBadge();
+  showToast('精算処理へ移行しました ✓', 'success');
 }
 
 function markSettled(id) {
   const e = expenses.find(x => x.id === id);
   if (!e) return;
+  // 精算処理待ち → 精算済み
   e.status = 'settled';
+  e.settledDate = new Date().toISOString().slice(0,10);
   e.history.push({ action: 'settled', who: me().name, at: new Date().toISOString(), note: '振込完了' });
   save(); renderApproval(); updateBadge();
   showToast('精算済みにしました ✓', 'success');
@@ -994,39 +1046,70 @@ function openDetail(id) {
     receiptHtml = `<p class="receipt-none">領収書なし</p>`;
   }
 
-  // Finance status box
-  let financeHtml = '';
-  if (['finance_pending','finance_processing','settled'].includes(e.status)) {
-    financeHtml = `
-      <div class="finance-status-box">
-        <div class="finance-status-label">経理処理状況</div>
-        <div class="finance-status-row">
-          <div class="finance-status-value">${STATUS_LABEL[e.status]}</div>
-          ${e.settledDate ? `<div class="finance-settled-date">精算予定日: ${e.settledDate}</div>` : ''}
-        </div>
-      </div>`;
-  }
+  // Finance status pipeline
+  const PIPELINE = [
+    { key: 'pending',              label: '申請' },
+    { key: 'manager_approved',     label: '上長承認' },
+    { key: 'finance_pending',      label: '経理承認済み' },
+    { key: 'finance_processing',   label: '精算処理待ち' },
+    { key: 'settled',              label: '精算済み' },
+  ];
+  const ORDER = ['pending','manager_approved','finance_pending','finance_processing','settled'];
+  const curIdx = ORDER.indexOf(e.status);
+  const financeHtml = `
+    <div class="finance-pipeline">
+      <div class="finance-pipeline-label">経理処理フロー</div>
+      <div class="finance-pipeline-steps">
+        ${PIPELINE.map((p, i) => {
+          const done    = curIdx > i || e.status === p.key;
+          const current = e.status === p.key;
+          const rejected = e.status === 'rejected';
+          return `
+            <div class="pipeline-step ${done && !rejected ? 'done' : ''} ${current ? 'current' : ''}">
+              <div class="pipeline-dot">${done && !rejected ? '✓' : i+1}</div>
+              <div class="pipeline-label">${p.label}</div>
+            </div>
+            ${i < PIPELINE.length-1 ? `<div class="pipeline-line ${curIdx > i && !rejected ? 'done' : ''}"></div>` : ''}
+          `;
+        }).join('')}
+      </div>
+      ${e.settledDate ? `<div style="margin-top:8px;font-size:12px;color:var(--gray-500);text-align:center">精算予定日: <strong>${e.settledDate}</strong></div>` : ''}
+    </div>
+  `;
 
   // Timeline
   const ACTION_LABEL = {
-    submitted:       '申請',
-    manager_approved:'上長承認',
-    finance_approved:'経理確認',
-    finance_pending: '経理処理待ち',
-    finance_processing:'処理中',
-    settled:         '精算完了',
-    rejected:        '差し戻し',
+    submitted:        '申請',
+    manager_approved: '上長承認',
+    finance_approved: '経理承認',
+    processing:       '精算処理開始',
+    settled:          '精算完了',
+    rejected:         '差し戻し',
   };
+  const ACTION_FUTURE = {
+    manager_approved: '上長承認（待ち）',
+    finance_approved: '経理承認（待ち）',
+    processing:       '精算処理（待ち）',
+    settled:          '精算完了（待ち）',
+  };
+
+  function fmtShort(iso) {
+    if (!iso) return '';
+    const dt = new Date(iso);
+    return `${dt.getMonth()+1}/${dt.getDate()} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
+  }
+
   const timelineHtml = e.history.map(h => {
-    const isDone = h.action !== 'pending';
-    const isRej  = h.action === 'rejected';
+    const isRej = h.action === 'rejected';
     return `
       <div class="timeline-item">
         <div class="timeline-dot ${isRej ? 'rejected' : 'done'}">${isRej ? '✕' : '✓'}</div>
         <div class="timeline-body">
-          <div class="timeline-action">${ACTION_LABEL[h.action] || h.action}</div>
-          <div class="timeline-who">${h.who}</div>
-          <div class="timeline-when">${formatDateTime(h.at)}</div>
+          <div class="timeline-row">
+            <span class="timeline-when-inline">${fmtShort(h.at)}</span>
+            <span class="timeline-who-inline">${h.who}</span>
+            <span class="timeline-action-inline">${ACTION_LABEL[h.action] || h.action}</span>
+          </div>
           ${h.note ? `<div class="timeline-note">${h.note}</div>` : ''}
         </div>
       </div>`;
@@ -1035,22 +1118,34 @@ function openDetail(id) {
   // Pending steps
   const nextSteps = [];
   if (!['settled','rejected'].includes(e.status)) {
-    if (e.status === 'pending') {
-      nextSteps.push('manager_approved', 'finance_approved', 'settled');
-    } else if (e.status === 'manager_approved') {
-      nextSteps.push('finance_approved', 'settled');
-    } else if (e.status === 'finance_pending') {
-      nextSteps.push('settled');
-    } else if (e.status === 'finance_processing') {
-      nextSteps.push('settled');
-    }
+    if (e.status === 'pending')            nextSteps.push('manager_approved','finance_approved','processing','settled');
+    else if (e.status === 'manager_approved') nextSteps.push('finance_approved','processing','settled');
+    else if (e.status === 'finance_pending')  nextSteps.push('processing','settled');
+    else if (e.status === 'finance_processing') nextSteps.push('settled');
   }
-  const pendingStepsHtml = nextSteps.map(s => `
+
+  // Show current waiting line
+  const currentLine = nextSteps.length && approver
+    ? `<div class="timeline-item">
+        <div class="timeline-dot pending" style="background:var(--warning-light);color:var(--warning);border-color:var(--warning)">…</div>
+        <div class="timeline-body">
+          <div class="timeline-row">
+            <span class="timeline-when-inline" style="color:var(--warning)">現在</span>
+            <span class="timeline-who-inline" style="color:var(--warning)">${approver}</span>
+            <span class="timeline-action-inline" style="color:var(--warning)">${ACTION_FUTURE[nextSteps[0]] || '処理待ち'}</span>
+          </div>
+        </div>
+       </div>`
+    : '';
+
+  const pendingStepsHtml = currentLine + nextSteps.slice(1).map(s => `
     <div class="timeline-item">
       <div class="timeline-dot pending">○</div>
       <div class="timeline-body">
-        <div class="timeline-action" style="color:var(--gray-400)">${ACTION_LABEL[s] || s}</div>
-        <div class="timeline-who" style="color:var(--gray-300)">—</div>
+        <div class="timeline-row">
+          <span class="timeline-when-inline" style="color:var(--gray-300)">—</span>
+          <span class="timeline-action-inline" style="color:var(--gray-400)">${ACTION_FUTURE[s] || s}</span>
+        </div>
       </div>
     </div>`).join('');
 
