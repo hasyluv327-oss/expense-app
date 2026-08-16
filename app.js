@@ -1586,11 +1586,15 @@ function showToast(msg, type = '') {
 function openLightbox(expId) {
   const e = expenses.find(x => x.id === Number(expId));
   if (!e || !e.receiptData) return;
+  const lb = document.getElementById('lightbox');
   document.getElementById('lightboxImg').src = e.receiptData;
-  document.getElementById('lightbox').classList.remove('hidden');
+  lb.classList.remove('hidden');
+  lb.style.cssText = 'display:flex!important;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;background:rgba(0,0,0,.88);align-items:center;justify-content:center;padding:24px;';
 }
 function closeLightbox() {
-  document.getElementById('lightbox').classList.add('hidden');
+  const lb = document.getElementById('lightbox');
+  lb.style.cssText = 'display:none!important;';
+  lb.classList.add('hidden');
   document.getElementById('lightboxImg').src = '';
 }
 document.addEventListener('keydown', ev => { if (ev.key === 'Escape') closeLightbox(); });
