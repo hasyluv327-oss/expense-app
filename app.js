@@ -1473,13 +1473,13 @@ function openDetail(id) {
     receiptSection = `
       <div class="detail-section">
         <div class="detail-section-title">領収書</div>
-        <div class="detail-receipt-fullwidth" onclick="openLightbox('${e.id}')">
+        <button type="button" class="detail-receipt-fullwidth" onclick="openLightbox(${e.id})">
           <img src="${e.receiptData}" class="detail-receipt-full-img">
           <div class="detail-receipt-overlay">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
-            クリックで拡大
+            タップして拡大
           </div>
-        </div>
+        </button>
         <div class="detail-receipt-fname">${e.receiptName}</div>
       </div>`;
   } else if (e.receiptMock) {
