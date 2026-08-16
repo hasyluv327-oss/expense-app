@@ -1087,6 +1087,19 @@ textarea { resize: vertical; }
 .el-person-dept { font-size: 12px; color: var(--gray-400); font-weight: 400; }
 .el-person-total { margin-left: auto; font-size: 14px; font-weight: 700; color: var(--gray-900); }
 .el-person-total.el-all-settled { color: var(--success); }
+
+/* 精算日 列 */
+.el-td-settled-date { font-size: 12px; color: var(--success); white-space: nowrap; }
+.el-settled-date { font-weight: 600; }
+
+/* 一括精算確認モーダル */
+.settle-confirm-body { padding: 8px 0 4px; }
+.settle-confirm-lines { background: var(--gray-50); border-radius: 8px; padding: 16px 20px; margin-bottom: 14px; line-height: 1.9; }
+.settle-confirm-line { font-size: 14px; color: var(--gray-700); }
+.settle-confirm-count { font-size: 22px; font-weight: 700; color: var(--gray-900); }
+.settle-confirm-amt   { font-size: 20px; font-weight: 700; color: var(--primary); }
+.settle-confirm-note  { font-size: 12px; color: var(--gray-400); margin-bottom: 20px; }
+.settle-confirm-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; }
 .el-settled-hint { font-size: 11px; color: var(--gray-400); margin-left: 6px; }
 .el-unapproved-hint { font-size: 11px; color: var(--warning); background: var(--warning-light); border-radius: 4px; padding: 2px 8px; margin-left: 8px; }
 

@@ -1196,6 +1196,11 @@ function renderExpList() {
             ? `<span class="el-pdf-ok">📄 あり</span>`
             : `<span class="el-pdf-none">—</span>`;
 
+        // 精算日 (settled のみ表示)
+        const settledDateCell = e.settlement === 'settled' && e.settledDate
+          ? `<span class="el-settled-date">${e.settledDate.replace(/-/g,'/')}</span>`
+          : `<span style="color:var(--gray-300)">—</span>`;
+
         return `
           <tr class="el-row" onclick="openDetail(${e.id})">
             <td><span class="el-cat-badge" style="background:${catColor}20;color:${catColor}">${e.category}</span></td>
@@ -1204,6 +1209,7 @@ function renderExpList() {
             <td class="el-td-payee">${e.payee}${detail ? `<div class="el-td-detail">${detail}</div>` : ''}</td>
             <td class="el-td-amount amount">${fmt(e.amount)}</td>
             <td class="el-td-status">${settlementBadge(e)}</td>
+            <td class="el-td-settled-date">${settledDateCell}</td>
             <td class="el-td-receipt">${receiptBtn}</td>
             <td class="el-td-action" onclick="event.stopPropagation()">
               <button class="el-detail-btn" onclick="openDetail(${e.id})">詳細</button>
@@ -1211,16 +1217,16 @@ function renderExpList() {
           </tr>`;
       }).join('');
 
-      // 振込額 = 未精算の合計（精算対象）
+      // 精算額 = 承認完了かつ未精算の合計
       const unsettledAmt = items.filter(e => e.settlement !== 'settled').reduce((s, e) => s + e.amount, 0);
       const unsettledCnt = items.filter(e => e.settlement !== 'settled').length;
       const settledCnt   = items.filter(e => e.settlement === 'settled').length;
 
       const personSettleBtn = (me().role === 'finance' && unsettledCnt > 0)
-        ? `<button class="el-settle-btn" onclick="event.stopPropagation();elSettlePerson('${mk}','${uid}')">社員一括精算（${unsettledCnt}件）</button>`
+        ? `<button class="el-settle-btn" onclick="event.stopPropagation();elSettlePersonConfirm('${mk}','${uid}')">社員一括精算（${unsettledCnt}件）</button>`
         : '';
       const personTotalLabel = unsettledCnt > 0
-        ? `<span class="el-person-total">振込額 ${fmt(unsettledAmt)}</span><span class="el-settled-hint">（精算済 ${settledCnt}件）</span>`
+        ? `<span class="el-person-total">精算額 ${fmt(unsettledAmt)}</span><span class="el-settled-hint">（精算済 ${settledCnt}件）</span>`
         : `<span class="el-person-total el-all-settled">✓ 精算済み ${fmt(personTotal)}</span>`;
 
       return `
@@ -1238,7 +1244,7 @@ function renderExpList() {
               <thead>
                 <tr>
                   <th>カテゴリ</th><th>利用日</th><th>件名</th>
-                  <th>支払先 / 経路</th><th>金額</th><th>精算状況</th><th>領収書</th><th>操作</th>
+                  <th>支払先 / 経路</th><th>金額</th><th>精算状況</th><th>精算日</th><th>領収書</th><th>操作</th>
                 </tr>
               </thead>
               <tbody>${rowsHtml}</tbody>
@@ -1258,7 +1264,7 @@ function renderExpList() {
       : '';
 
     const monthSettleBtn = (me().role === 'finance' && monthUnsettledCnt > 0)
-      ? `<button class="el-settle-btn el-month-settle-btn" onclick="event.stopPropagation();elSettleMonth('${mk}')">月一括精算（${monthUnsettledCnt}件 ${fmt(monthUnsettledAmt)}）</button>`
+      ? `<button class="el-settle-btn el-month-settle-btn" onclick="event.stopPropagation();elSettleMonthConfirm('${mk}')">月一括精算（${monthUnsettledCnt}件 ${fmt(monthUnsettledAmt)}）</button>`
       : '';
 
     return `
@@ -1291,12 +1297,51 @@ function elTogglePerson(header) {
   icon.textContent = collapsed ? '▼' : '▶';
 }
 
-// 月一括精算
-function elSettleMonth(mk) {
+// 一括精算確認モーダルを開いて実行する共通関数
+function openSettleConfirm({ title, lines, note, onConfirm }) {
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalContent').innerHTML = `
+    <div class="settle-confirm-body">
+      <div class="settle-confirm-lines">
+        ${lines.map(l => `<div class="settle-confirm-line">${l}</div>`).join('')}
+      </div>
+      ${note ? `<p class="settle-confirm-note">${note}</p>` : ''}
+      <div class="settle-confirm-actions">
+        <button class="btn-secondary" onclick="document.getElementById('modal').classList.add('hidden')">キャンセル</button>
+        <button class="btn-success" id="settleConfirmOk">精算済みにする</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('modal').classList.remove('hidden');
+  document.getElementById('settleConfirmOk').addEventListener('click', () => {
+    document.getElementById('modal').classList.add('hidden');
+    onConfirm();
+  });
+}
+
+// 月一括精算 — 確認モーダル付き
+function elSettleMonthConfirm(mk) {
   const targets = expenses.filter(e =>
     monthKey(e.date) === mk && e.status === 'completed' && e.settlement !== 'settled'
   );
   if (!targets.length) return;
+  const [y, m] = mk.split('-');
+  const monthLabel = `${y}年${parseInt(m)}月`;
+  const total = targets.reduce((s, e) => s + e.amount, 0);
+  openSettleConfirm({
+    title: '月一括精算の確認',
+    lines: [
+      `<strong>${monthLabel}</strong> の精算対象（承認完了・未精算）`,
+      `<span class="settle-confirm-count">${targets.length}件</span>　<span class="settle-confirm-amt">${fmt(total)}</span>`,
+    ],
+    note: '未承認・差し戻し案件は含まれません。',
+    onConfirm: () => elSettleMonth(mk, targets),
+  });
+}
+function elSettleMonth(mk, targets) {
+  if (!targets) targets = expenses.filter(e =>
+    monthKey(e.date) === mk && e.status === 'completed' && e.settlement !== 'settled'
+  );
   const now = new Date().toISOString();
   const today = now.slice(0, 10);
   targets.forEach(e => {
@@ -1308,13 +1353,30 @@ function elSettleMonth(mk) {
   showToast(`${targets.length}件を精算済みにしました ✓`, 'success');
 }
 
-// 社員一括精算
-function elSettlePerson(mk, uid) {
+// 社員一括精算 — 確認モーダル付き
+function elSettlePersonConfirm(mk, uid) {
   const targets = expenses.filter(e =>
     monthKey(e.date) === mk && e.submitterId === uid &&
     e.status === 'completed' && e.settlement !== 'settled'
   );
   if (!targets.length) return;
+  const u = USERS[uid];
+  const total = targets.reduce((s, e) => s + e.amount, 0);
+  openSettleConfirm({
+    title: '社員精算の確認',
+    lines: [
+      `<strong>${u?.name || uid}</strong>（${u?.dept || ''}）`,
+      `<span class="settle-confirm-count">${targets.length}件</span>　<span class="settle-confirm-amt">${fmt(total)}</span> を精算済みにしますか？`,
+    ],
+    note: null,
+    onConfirm: () => elSettlePerson(mk, uid, targets),
+  });
+}
+function elSettlePerson(mk, uid, targets) {
+  if (!targets) targets = expenses.filter(e =>
+    monthKey(e.date) === mk && e.submitterId === uid &&
+    e.status === 'completed' && e.settlement !== 'settled'
+  );
   const now = new Date().toISOString();
   const today = now.slice(0, 10);
   targets.forEach(e => {
