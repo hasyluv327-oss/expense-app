@@ -342,7 +342,7 @@ const DUMMY = [
 ];
 
 // ── State ────────────────────────────────────────────────────────────────────
-const DATA_VERSION = '6';  // increment when DUMMY data structure changes
+const DATA_VERSION = '7';  // increment when DUMMY data structure changes
 if (localStorage.getItem('ef_data_version') !== DATA_VERSION) {
   localStorage.removeItem('ef_expenses');
   localStorage.setItem('ef_data_version', DATA_VERSION);
