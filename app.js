@@ -1222,7 +1222,8 @@ function renderExpList() {
   const stFil   = document.getElementById('elStatus').value;
   const catFil  = document.getElementById('elCategory').value;
 
-  let filtered = expenses.slice();
+  const APPROVED_STATUSES = ['manager_approved','finance_pending','finance_processing','settled'];
+  let filtered = expenses.filter(e => APPROVED_STATUSES.includes(e.status));
   if (monFil !== 'all') filtered = filtered.filter(e => monthKey(e.submitDate) === monFil);
   if (usrFil !== 'all') filtered = filtered.filter(e => e.submitterId === usrFil);
   if (stFil  !== 'all') filtered = filtered.filter(e => e.status === stFil);
