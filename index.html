@@ -61,19 +61,29 @@
       <div id="view-dashboard" class="view active">
         <div class="page-header">
           <h1 id="dashTitle">ダッシュボード</h1>
-          <div class="month-selector">
-            <button id="prevMonth">‹</button>
-            <span id="currentMonthLabel"></span>
-            <button id="nextMonth">›</button>
+          <div style="display:flex;gap:10px;align-items:center">
+            <button class="btn-csv hidden" id="dashCsvExport">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              CSV出力
+            </button>
+            <div class="month-selector">
+              <button id="prevMonth">‹</button>
+              <span id="currentMonthLabel"></span>
+              <button id="nextMonth">›</button>
+            </div>
           </div>
         </div>
 
         <!-- Action alerts (manager/finance) -->
         <div id="actionAlerts" class="action-alerts hidden"></div>
 
+        <!-- Finance queue (経理専用 処理待ちリスト) -->
+        <div id="financeQueue" class="hidden"></div>
+
+        <!-- Employee/manager stats -->
         <div class="stats-grid" id="statsGrid"></div>
 
-        <div class="charts-grid">
+        <div class="charts-grid" id="chartsGrid">
           <div class="card chart-card">
             <h3>カテゴリ別内訳</h3>
             <canvas id="categoryChart"></canvas>
@@ -84,13 +94,13 @@
           </div>
         </div>
 
-        <div class="card">
+        <div class="card" id="recentCard">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-            <h3 style="margin:0">最近の申請</h3>
+            <h3 style="margin:0" id="recentTitle">最近の申請</h3>
             <span id="recentSubtitle" style="font-size:12px;color:var(--gray-400)"></span>
           </div>
           <table class="expense-table">
-            <thead>
+            <thead id="recentTableHead">
               <tr>
                 <th>申請日</th>
                 <th>申請者</th>

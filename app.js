@@ -411,9 +411,6 @@ let categoryChart, trendChart;
 
 function renderDashboard() {
   const role = me().role;
-  document.getElementById('dashTitle').textContent =
-    role === 'employee' ? 'マイダッシュボード' : 'ダッシュボード';
-
   const y = currentMonth.getFullYear();
   const m = currentMonth.getMonth();
 
@@ -426,7 +423,21 @@ function renderDashboard() {
     ? allMonth.filter(e => e.submitterId === currentUserId)
     : allMonth;
 
-  // ── Action alerts for manager/finance ──
+  // Finance gets a completely different dashboard
+  if (role === 'finance') {
+    renderFinanceDashboard(y, m, allMonth);
+    return;
+  }
+
+  document.getElementById('dashTitle').textContent =
+    role === 'employee' ? 'マイダッシュボード' : '承認ダッシュボード';
+  document.getElementById('dashCsvExport').classList.add('hidden');
+  document.getElementById('financeQueue').classList.add('hidden');
+  document.getElementById('statsGrid').classList.remove('hidden');
+  document.getElementById('chartsGrid').classList.remove('hidden');
+  document.getElementById('recentCard').classList.remove('hidden');
+
+  // ── Action alerts (manager only here; finance handled separately above) ──
   const alerts = document.getElementById('actionAlerts');
   if (role === 'manager') {
     const needAction = expenses.filter(e => e.status === 'pending');
@@ -453,43 +464,6 @@ function renderDashboard() {
         <div class="action-card-label">今月の承認完了</div>
         <div class="action-card-value">${allMonth.filter(e=>['manager_approved','finance_pending','finance_processing','settled'].includes(e.status)).length}件</div>
         <div class="action-card-sub">${fmt(allMonth.filter(e=>['manager_approved','finance_pending','finance_processing','settled'].includes(e.status)).reduce((s,e)=>s+e.amount,0))}</div>
-      </div>
-    `;
-  } else if (role === 'finance') {
-    const waitFinance   = expenses.filter(e => e.status === 'manager_approved');
-    const finApproved   = expenses.filter(e => e.status === 'finance_pending');
-    const processing    = expenses.filter(e => e.status === 'finance_processing');
-    const rejected      = expenses.filter(e => e.status === 'rejected');
-    const settledMonth  = allMonth.filter(e => e.status === 'settled');
-    const settledAmt    = settledMonth.reduce((s,e)=>s+e.amount,0);
-    const scheduledAmt  = finApproved.reduce((s,e)=>s+e.amount,0) + processing.reduce((s,e)=>s+e.amount,0);
-    alerts.classList.remove('hidden');
-    alerts.classList.add('five-col');
-    alerts.innerHTML = `
-      <div class="action-card urgent">
-        <div class="action-card-label">経理確認待ち</div>
-        <div class="action-card-value">${waitFinance.length}件</div>
-        <div class="action-card-sub">${fmt(waitFinance.reduce((s,e)=>s+e.amount,0))}</div>
-      </div>
-      <div class="action-card warn">
-        <div class="action-card-label">今日の対応</div>
-        <div class="action-card-value">${waitFinance.length + processing.length}件</div>
-        <div class="action-card-sub">確認＋処理中</div>
-      </div>
-      <div class="action-card">
-        <div class="action-card-label">差し戻し中</div>
-        <div class="action-card-value">${rejected.length}件</div>
-        <div class="action-card-sub">再申請待ち</div>
-      </div>
-      <div class="action-card" style="border-top-color:var(--purple)">
-        <div class="action-card-label">今月精算予定</div>
-        <div class="action-card-value" style="font-size:18px">${fmt(scheduledAmt)}</div>
-        <div class="action-card-sub">${finApproved.length + processing.length}件</div>
-      </div>
-      <div class="action-card ok">
-        <div class="action-card-label">今月処理済み</div>
-        <div class="action-card-value">${settledMonth.length}件</div>
-        <div class="action-card-sub">${fmt(settledAmt)}</div>
       </div>
     `;
   } else {
@@ -526,6 +500,7 @@ function renderDashboard() {
       </div>
     `;
   } else {
+    // manager
     const pending  = allMonth.filter(e => e.status === 'pending');
     const approved = allMonth.filter(e => ['manager_approved','finance_pending','finance_processing','settled'].includes(e.status));
     const settled  = allMonth.filter(e => e.status === 'settled');
@@ -552,6 +527,8 @@ function renderDashboard() {
       </div>
     `;
   }
+  document.getElementById('recentSubtitle').textContent =
+    role === 'employee' ? '自分の申請' : '全員の申請';
 
   // ── Category chart ──
   const chartData = role === 'employee' ? myMonth : allMonth;
@@ -606,9 +583,6 @@ function renderDashboard() {
   });
 
   // ── Recent table ──
-  document.getElementById('recentSubtitle').textContent =
-    role === 'employee' ? '自分の申請' : '全員の申請';
-
   const recent = (role === 'employee'
     ? expenses.filter(e => e.submitterId === currentUserId)
     : expenses
@@ -631,6 +605,209 @@ function renderDashboard() {
           </tr>`;
       }).join('')
     : '<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--gray-400)">この月の申請はありません</td></tr>';
+}
+
+// ── Finance Dashboard (専用) ──────────────────────────────────────────────────
+function renderFinanceDashboard(y, m, allMonth) {
+  document.getElementById('dashTitle').textContent = '経理ダッシュボード';
+  document.getElementById('dashCsvExport').classList.remove('hidden');
+  document.getElementById('statsGrid').classList.add('hidden');
+  document.getElementById('financeQueue').classList.remove('hidden');
+  document.getElementById('recentCard').classList.remove('hidden');
+
+  // 5 summary cards
+  const waitFinance  = expenses.filter(e => e.status === 'manager_approved');
+  const finApproved  = expenses.filter(e => e.status === 'finance_pending');
+  const processing   = expenses.filter(e => e.status === 'finance_processing');
+  const rejected     = expenses.filter(e => e.status === 'rejected');
+  const settledMonth = allMonth.filter(e => e.status === 'settled');
+  const scheduledAmt = finApproved.reduce((s,e)=>s+e.amount,0) + processing.reduce((s,e)=>s+e.amount,0);
+
+  const alerts = document.getElementById('actionAlerts');
+  alerts.classList.remove('hidden');
+  alerts.className = 'action-alerts five-col';
+  alerts.innerHTML = `
+    <div class="action-card urgent">
+      <div class="action-card-label">経理確認待ち</div>
+      <div class="action-card-value">${waitFinance.length}件</div>
+      <div class="action-card-sub">${fmt(waitFinance.reduce((s,e)=>s+e.amount,0))}</div>
+    </div>
+    <div class="action-card warn">
+      <div class="action-card-label">今日の対応</div>
+      <div class="action-card-value">${waitFinance.length + processing.length}件</div>
+      <div class="action-card-sub">確認＋処理中</div>
+    </div>
+    <div class="action-card">
+      <div class="action-card-label">差し戻し中</div>
+      <div class="action-card-value">${rejected.length}件</div>
+      <div class="action-card-sub">再申請待ち</div>
+    </div>
+    <div class="action-card" style="border-top-color:var(--purple)">
+      <div class="action-card-label">今月精算予定</div>
+      <div class="action-card-value" style="font-size:19px">${fmt(scheduledAmt)}</div>
+      <div class="action-card-sub">${finApproved.length + processing.length}件</div>
+    </div>
+    <div class="action-card ok">
+      <div class="action-card-label">今月処理済み</div>
+      <div class="action-card-value">${settledMonth.length}件</div>
+      <div class="action-card-sub">${fmt(settledMonth.reduce((s,e)=>s+e.amount,0))}</div>
+    </div>
+  `;
+
+  // 処理キュー (今やるべき申請リスト)
+  const queue = [
+    ...expenses.filter(e => e.status === 'manager_approved'),
+    ...expenses.filter(e => e.status === 'finance_pending'),
+    ...expenses.filter(e => e.status === 'finance_processing'),
+  ];
+
+  const queueHtml = queue.length ? `
+    <div class="fq-section">
+      <div class="fq-section-label urgent-label">
+        <span class="fq-dot urgent"></span> 今対応が必要な申請
+        <span class="fq-count">${queue.length}件</span>
+      </div>
+      <table class="expense-table">
+        <thead>
+          <tr>
+            <th>申請日</th>
+            <th>申請者</th>
+            <th>内容</th>
+            <th>カテゴリ</th>
+            <th>金額</th>
+            <th>領収書</th>
+            <th>ステータス</th>
+            <th>アクション</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${queue.map(e => {
+            const receipt = e.receiptData
+              ? `<img src="${e.receiptData}" class="tbl-receipt-thumb" onclick="event.stopPropagation();window.open('${e.receiptData}')">`
+              : e.receiptMock
+                ? `<span class="tbl-receipt-ok">📄 あり</span>`
+                : `<span class="tbl-receipt-none">なし</span>`;
+
+            let actionBtn = '';
+            if (e.status === 'manager_approved') {
+              actionBtn = `
+                <button class="btn-success fq-btn" onclick="event.stopPropagation();fqApprove(${e.id})">経理承認</button>
+                <button class="btn-danger fq-btn"  onclick="event.stopPropagation();openRejectModal(${e.id})">差戻し</button>`;
+            } else if (e.status === 'finance_pending') {
+              actionBtn = `<button class="btn-warn fq-btn" onclick="event.stopPropagation();fqProcess(${e.id})">精算処理へ</button>`;
+            } else if (e.status === 'finance_processing') {
+              actionBtn = `<button class="btn-success fq-btn" onclick="event.stopPropagation();fqSettle(${e.id})">精算済みに</button>`;
+            }
+
+            return `
+              <tr onclick="openDetail(${e.id})">
+                <td>${formatDate(e.submitDate)}</td>
+                <td style="font-weight:600">${submitterName(e)}</td>
+                <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.memo}</td>
+                <td><span style="font-size:11px;background:var(--gray-100);padding:2px 8px;border-radius:4px">${e.category}</span></td>
+                <td class="amount">${fmt(e.amount)}</td>
+                <td>${receipt}</td>
+                <td>${statusBadge(e.status)}</td>
+                <td onclick="event.stopPropagation()" style="white-space:nowrap">${actionBtn}
+                  <button class="btn-sm fq-btn" onclick="event.stopPropagation();openDetail(${e.id})">詳細</button>
+                </td>
+              </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  ` : `
+    <div class="fq-empty">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-5"/></svg>
+      <p>対応が必要な申請はありません</p>
+    </div>
+  `;
+
+  document.getElementById('financeQueue').innerHTML = `
+    <div class="finance-queue-card">
+      ${queueHtml}
+    </div>
+  `;
+
+  // 最近の精算済み
+  document.getElementById('recentTitle').textContent = '最近の精算済み';
+  document.getElementById('recentSubtitle').textContent = '今月';
+  document.getElementById('recentTableHead').innerHTML = `
+    <tr>
+      <th>申請日</th><th>申請者</th><th>内容</th><th>カテゴリ</th><th>金額</th><th>精算日</th>
+    </tr>`;
+
+  const recentSettled = expenses
+    .filter(e => e.status === 'settled')
+    .sort((a,b) => b.submitDate.localeCompare(a.submitDate))
+    .slice(0, 6);
+
+  document.getElementById('recentTableBody').innerHTML = recentSettled.length
+    ? recentSettled.map(e => {
+        const settledEntry = e.history.find(h => h.action === 'settled');
+        return `
+          <tr onclick="openDetail(${e.id})">
+            <td>${formatDate(e.submitDate)}</td>
+            <td style="font-weight:600">${submitterName(e)}</td>
+            <td>${e.memo}</td>
+            <td><span style="font-size:11px;background:var(--gray-100);padding:2px 8px;border-radius:4px">${e.category}</span></td>
+            <td class="amount">${fmt(e.amount)}</td>
+            <td style="color:var(--success);font-weight:600">${e.settledDate || formatDate(settledEntry?.at) || '—'}</td>
+          </tr>`;
+      }).join('')
+    : '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--gray-400)">精算済み案件はありません</td></tr>';
+
+  // Charts at bottom for finance
+  document.getElementById('chartsGrid').classList.remove('hidden');
+  const cats = {};
+  allMonth.forEach(e => { cats[e.category] = (cats[e.category] || 0) + e.amount; });
+  const COLORS = ['#4F46E5','#7C3AED','#0284C7','#059669','#D97706','#DC2626','#6B7280'];
+  if (categoryChart) categoryChart.destroy();
+  categoryChart = new Chart(document.getElementById('categoryChart'), {
+    type: 'doughnut',
+    data: { labels: Object.keys(cats), datasets: [{ data: Object.values(cats), backgroundColor: COLORS, borderWidth: 2, borderColor: '#fff' }] },
+    options: { plugins: { legend: { position: 'right', labels: { font:{size:11}, padding:10 } }, tooltip: { callbacks: { label: ctx => ` ${fmt(ctx.raw)}` } } }, cutout: '60%' },
+  });
+  const trendLabels = [], trendData = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(y, m - i, 1);
+    trendLabels.push(`${d.getMonth()+1}月`);
+    trendData.push(expenses.filter(e => { const ed = new Date(e.date); return ed.getFullYear()===d.getFullYear()&&ed.getMonth()===d.getMonth(); }).reduce((s,e)=>s+e.amount,0));
+  }
+  if (trendChart) trendChart.destroy();
+  trendChart = new Chart(document.getElementById('trendChart'), {
+    type: 'bar',
+    data: { labels: trendLabels, datasets: [{ label:'経費合計', data: trendData, backgroundColor:'rgba(79,70,229,.15)', borderColor:'#4F46E5', borderWidth:2, borderRadius:6 }] },
+    options: { plugins:{legend:{display:false}}, scales:{ y:{ticks:{callback:v=>'¥'+v.toLocaleString()},grid:{color:'#F3F4F6'}}, x:{grid:{display:false}} } },
+  });
+}
+
+// Finance queue inline actions (dashboard)
+function fqApprove(id) {
+  const e = expenses.find(x => x.id === id);
+  if (!e) return;
+  e.status = 'finance_pending';
+  e.history.push({ action: 'finance_approved', who: me().name, at: new Date().toISOString(), note: '' });
+  e.settledDate = '2026-07-25';
+  save(); renderDashboard(); updateBadge();
+  showToast('経理承認しました ✓', 'success');
+}
+function fqProcess(id) {
+  const e = expenses.find(x => x.id === id);
+  if (!e) return;
+  e.status = 'finance_processing';
+  e.history.push({ action: 'processing', who: me().name, at: new Date().toISOString(), note: '精算処理開始' });
+  save(); renderDashboard(); updateBadge();
+  showToast('精算処理へ移行しました ✓', 'success');
+}
+function fqSettle(id) {
+  const e = expenses.find(x => x.id === id);
+  if (!e) return;
+  e.status = 'settled';
+  e.settledDate = new Date().toISOString().slice(0,10);
+  e.history.push({ action: 'settled', who: me().name, at: new Date().toISOString(), note: '振込完了' });
+  save(); renderDashboard(); updateBadge();
+  showToast('精算済みにしました ✓', 'success');
 }
 
 document.getElementById('prevMonth').addEventListener('click', () => {
@@ -934,6 +1111,7 @@ document.getElementById('filterCategory').addEventListener('change', renderHisto
 document.getElementById('filterMonth').addEventListener('change', renderHistory);
 
 document.getElementById('csvExport').addEventListener('click', exportCSV);
+document.getElementById('dashCsvExport').addEventListener('click', exportCSV);
 
 function renderHistory() {
   const role   = me().role;

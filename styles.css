@@ -700,6 +700,58 @@ textarea { resize: vertical; }
 .toast.success { background: var(--success); }
 .toast.error   { background: var(--danger); }
 
+/* ── Finance Queue ── */
+.finance-queue-card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--gray-200);
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+.fq-section { padding: 0; }
+.fq-section-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 20px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gray-700);
+  background: var(--gray-50);
+  border-bottom: 1px solid var(--gray-200);
+}
+.fq-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.fq-dot.urgent { background: var(--danger); }
+.fq-count {
+  margin-left: auto;
+  background: var(--danger);
+  color: white;
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 10px;
+}
+.fq-btn { margin: 2px 3px; }
+.fq-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 48px 20px;
+  color: var(--gray-400);
+}
+.fq-empty p { margin: 0; font-size: 14px; }
+.tbl-receipt-thumb {
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid var(--gray-200);
+}
+.tbl-receipt-ok { font-size: 12px; color: var(--success); font-weight: 500; }
+.tbl-receipt-none { font-size: 12px; color: var(--gray-300); }
+
 /* ── Utilities ── */
 .hidden { display: none !important; }
 .amount { font-weight: 600; color: var(--gray-900); }
