@@ -29,21 +29,29 @@ const CATEGORY_EXTRA = {
 };
 
 // ── Status config ────────────────────────────────────────────────────────────
+// 申請ステータス: pending → approved → completed / rejected
+// 精算ステータス: settlement = 'unsettled' | 'settled'  (completedのみ)
 const STATUS_LABEL = {
-  pending:              '上長承認待ち',
-  manager_approved:     '経理確認待ち',
-  finance_pending:      '経理承認済み',
-  finance_processing:   '精算処理待ち',
-  settled:              '精算済み',
-  rejected:             '差し戻し',
+  pending:   '上長承認待ち',
+  approved:  '経理承認待ち',
+  completed: '承認完了',
+  rejected:  '差し戻し',
 };
+const SETTLEMENT_LABEL = {
+  unsettled: '未精算',
+  settled:   '精算済み',
+};
+
+function settlementBadge(e) {
+  if (e.status !== 'completed') return '';
+  const s = e.settlement || 'unsettled';
+  return `<span class="settlement-badge settlement-${s}">${SETTLEMENT_LABEL[s]}</span>`;
+}
 
 function currentApproverText(e) {
   switch (e.status) {
-    case 'pending':            return '山田 健一（部長）';
-    case 'manager_approved':   return '中村 さき（経理）';
-    case 'finance_pending':
-    case 'finance_processing': return '中村 さき（経理）';
+    case 'pending':   return '山田 健一（部長）';
+    case 'approved':  return '中村 さき（経理）';
     default: return null;
   }
 }
@@ -58,15 +66,16 @@ const RECEIPT_IMGS = {
 
 // ── Dummy data ───────────────────────────────────────────────────────────────
 const DUMMY = [
-  // ── settled (past months) ──
+  // ── completed + settled (過去月、精算済み) ──
   {
     id: 1, submitterId: 'tanaka', date: '2026-06-02', submitDate: '2026-06-03',
     category: '交通費', payee: 'JR東日本', amount: 3200,
     memo: '大阪出張 往復', extra: { route: '東京→大阪（新幹線）' },
-    status: 'settled', receiptData: RECEIPT_IMGS.receipt_jr, receiptName: '領収書_JR_20260602.svg',
+    status: 'completed', settlement: 'settled',
+    receiptData: RECEIPT_IMGS.receipt_jr, receiptName: '領収書_JR_20260602.svg',
     settledDate: '2026-06-25',
     history: [
-      { action: 'submitted',       who: '田中 太郎', at: '2026-06-03T10:20:00', note: '' },
+      { action: 'submitted',        who: '田中 太郎', at: '2026-06-03T10:20:00', note: '' },
       { action: 'manager_approved', who: '山田 健一', at: '2026-06-04T11:05:00', note: '' },
       { action: 'finance_approved', who: '中村 さき', at: '2026-06-05T09:30:00', note: '' },
       { action: 'settled',          who: '中村 さき', at: '2026-06-25T10:00:00', note: '6月末振込済み' },
@@ -76,10 +85,11 @@ const DUMMY = [
     id: 2, submitterId: 'tanaka', date: '2026-06-05', submitDate: '2026-06-05',
     category: '会議費', payee: 'スターバックス', amount: 2400,
     memo: '取引先との打ち合わせ費用', extra: { attendees: '田中、得意先 佐野様', purpose: 'Q2受注折衝' },
-    status: 'settled', receiptData: RECEIPT_IMGS.receipt_starbucks, receiptName: '領収書_Starbucks_20260605.svg',
+    status: 'completed', settlement: 'settled',
+    receiptData: RECEIPT_IMGS.receipt_starbucks, receiptName: '領収書_Starbucks_20260605.svg',
     settledDate: '2026-06-25',
     history: [
-      { action: 'submitted',       who: '田中 太郎', at: '2026-06-05T18:00:00', note: '' },
+      { action: 'submitted',        who: '田中 太郎', at: '2026-06-05T18:00:00', note: '' },
       { action: 'manager_approved', who: '山田 健一', at: '2026-06-06T09:00:00', note: '' },
       { action: 'finance_approved', who: '中村 さき', at: '2026-06-07T10:00:00', note: '' },
       { action: 'settled',          who: '中村 さき', at: '2026-06-25T10:00:00', note: '' },
@@ -89,10 +99,10 @@ const DUMMY = [
     id: 3, submitterId: 'suzuki', date: '2026-06-18', submitDate: '2026-06-18',
     category: '会議費', payee: '椿屋珈琲', amount: 1800,
     memo: '社内勉強会 お茶代', extra: { attendees: '開発チーム 6名', purpose: 'セキュリティ勉強会' },
-    status: 'settled', receiptMock: true,
+    status: 'completed', settlement: 'settled', receiptMock: true,
     settledDate: '2026-06-25',
     history: [
-      { action: 'submitted',       who: '鈴木 次郎', at: '2026-06-18T17:30:00', note: '' },
+      { action: 'submitted',        who: '鈴木 次郎', at: '2026-06-18T17:30:00', note: '' },
       { action: 'manager_approved', who: '山田 健一', at: '2026-06-19T10:20:00', note: '' },
       { action: 'finance_approved', who: '中村 さき', at: '2026-06-20T09:45:00', note: '' },
       { action: 'settled',          who: '中村 さき', at: '2026-06-25T10:00:00', note: '' },
@@ -102,10 +112,10 @@ const DUMMY = [
     id: 4, submitterId: 'tanaka', date: '2026-05-10', submitDate: '2026-05-11',
     category: '交通費', payee: 'JR東日本', amount: 5600,
     memo: '福岡出張 往復', extra: { route: '東京→福岡（新幹線）' },
-    status: 'settled', receiptMock: true,
+    status: 'completed', settlement: 'settled', receiptMock: true,
     settledDate: '2026-05-31',
     history: [
-      { action: 'submitted',       who: '田中 太郎', at: '2026-05-11T08:00:00', note: '' },
+      { action: 'submitted',        who: '田中 太郎', at: '2026-05-11T08:00:00', note: '' },
       { action: 'manager_approved', who: '山田 健一', at: '2026-05-12T10:00:00', note: '' },
       { action: 'finance_approved', who: '中村 さき', at: '2026-05-13T09:00:00', note: '' },
       { action: 'settled',          who: '中村 さき', at: '2026-05-31T10:00:00', note: '' },
@@ -115,10 +125,10 @@ const DUMMY = [
     id: 5, submitterId: 'sato', date: '2026-05-18', submitDate: '2026-05-19',
     category: '接待費', payee: '六本木 △△', amount: 35000,
     memo: 'B社接待', extra: { client: '株式会社Bソリューションズ 渡辺部長', attendees: '5名（社内2名、先方3名）' },
-    status: 'settled', receiptMock: true,
+    status: 'completed', settlement: 'settled', receiptMock: true,
     settledDate: '2026-05-31',
     history: [
-      { action: 'submitted',       who: '佐藤 花子', at: '2026-05-19T09:30:00', note: '' },
+      { action: 'submitted',        who: '佐藤 花子', at: '2026-05-19T09:30:00', note: '' },
       { action: 'manager_approved', who: '山田 健一', at: '2026-05-20T11:00:00', note: '' },
       { action: 'finance_approved', who: '中村 さき', at: '2026-05-21T10:30:00', note: '' },
       { action: 'settled',          who: '中村 さき', at: '2026-05-31T10:00:00', note: '' },
@@ -128,10 +138,10 @@ const DUMMY = [
     id: 6, submitterId: 'tanaka', date: '2026-04-05', submitDate: '2026-04-06',
     category: '宿泊費', payee: 'ホテルニッコー京都', amount: 18000,
     memo: '京都出張 1泊', extra: { destination: '京都', nights: '1泊' },
-    status: 'settled', receiptMock: true,
+    status: 'completed', settlement: 'settled', receiptMock: true,
     settledDate: '2026-04-30',
     history: [
-      { action: 'submitted',       who: '田中 太郎', at: '2026-04-06T09:00:00', note: '' },
+      { action: 'submitted',        who: '田中 太郎', at: '2026-04-06T09:00:00', note: '' },
       { action: 'manager_approved', who: '山田 健一', at: '2026-04-07T10:00:00', note: '' },
       { action: 'finance_approved', who: '中村 さき', at: '2026-04-08T09:30:00', note: '' },
       { action: 'settled',          who: '中村 さき', at: '2026-04-30T10:00:00', note: '' },
@@ -141,10 +151,10 @@ const DUMMY = [
     id: 7, submitterId: 'suzuki', date: '2026-04-22', submitDate: '2026-04-22',
     category: '消耗品費', payee: 'ヨドバシカメラ', amount: 9800,
     memo: 'Webカメラ購入（テレワーク用）', extra: {},
-    status: 'settled', receiptMock: true,
+    status: 'completed', settlement: 'settled', receiptMock: true,
     settledDate: '2026-04-30',
     history: [
-      { action: 'submitted',       who: '鈴木 次郎', at: '2026-04-22T14:00:00', note: '' },
+      { action: 'submitted',        who: '鈴木 次郎', at: '2026-04-22T14:00:00', note: '' },
       { action: 'manager_approved', who: '山田 健一', at: '2026-04-23T10:00:00', note: '' },
       { action: 'finance_approved', who: '中村 さき', at: '2026-04-24T09:00:00', note: '' },
       { action: 'settled',          who: '中村 さき', at: '2026-04-30T10:00:00', note: '' },
@@ -154,10 +164,10 @@ const DUMMY = [
     id: 8, submitterId: 'tanaka', date: '2026-03-15', submitDate: '2026-03-16',
     category: '会議費', payee: '会議室レンタル', amount: 22000,
     memo: '四半期レビュー 会場費', extra: { attendees: '全社員 22名', purpose: '2026年Q1事業レビュー' },
-    status: 'settled', receiptMock: true,
+    status: 'completed', settlement: 'settled', receiptMock: true,
     settledDate: '2026-03-31',
     history: [
-      { action: 'submitted',       who: '田中 太郎', at: '2026-03-16T09:00:00', note: '' },
+      { action: 'submitted',        who: '田中 太郎', at: '2026-03-16T09:00:00', note: '' },
       { action: 'manager_approved', who: '山田 健一', at: '2026-03-17T10:00:00', note: '' },
       { action: 'finance_approved', who: '中村 さき', at: '2026-03-18T09:30:00', note: '' },
       { action: 'settled',          who: '中村 さき', at: '2026-03-31T10:00:00', note: '' },
@@ -167,10 +177,10 @@ const DUMMY = [
     id: 9, submitterId: 'sato', date: '2026-02-08', submitDate: '2026-02-09',
     category: '交通費', payee: '東海道新幹線', amount: 27280,
     memo: '大阪・名古屋 出張 往復', extra: { route: '東京→大阪→名古屋→東京' },
-    status: 'settled', receiptMock: true,
+    status: 'completed', settlement: 'settled', receiptMock: true,
     settledDate: '2026-02-28',
     history: [
-      { action: 'submitted',       who: '佐藤 花子', at: '2026-02-09T10:00:00', note: '' },
+      { action: 'submitted',        who: '佐藤 花子', at: '2026-02-09T10:00:00', note: '' },
       { action: 'manager_approved', who: '山田 健一', at: '2026-02-10T10:30:00', note: '' },
       { action: 'finance_approved', who: '中村 さき', at: '2026-02-11T09:00:00', note: '' },
       { action: 'settled',          who: '中村 さき', at: '2026-02-28T10:00:00', note: '' },
@@ -180,37 +190,35 @@ const DUMMY = [
     id: 10, submitterId: 'tanaka', date: '2026-01-20', submitDate: '2026-01-21',
     category: '接待費', payee: '丸の内 ◇◇', amount: 42000,
     memo: 'C社新年会接待', extra: { client: 'C株式会社 鈴木社長 他2名', attendees: '6名（社内3名、先方3名）' },
-    status: 'settled', receiptMock: true,
+    status: 'completed', settlement: 'settled', receiptMock: true,
     settledDate: '2026-01-31',
     history: [
-      { action: 'submitted',       who: '田中 太郎', at: '2026-01-21T09:00:00', note: '' },
+      { action: 'submitted',        who: '田中 太郎', at: '2026-01-21T09:00:00', note: '' },
       { action: 'manager_approved', who: '山田 健一', at: '2026-01-22T10:00:00', note: '' },
       { action: 'finance_approved', who: '中村 さき', at: '2026-01-23T09:30:00', note: '' },
       { action: 'settled',          who: '中村 さき', at: '2026-01-31T10:00:00', note: '' },
     ],
   },
-  // ── finance_processing (承認済み・処理中) ──
+  // ── completed + unsettled (承認完了・未精算) ──
   {
     id: 11, submitterId: 'tanaka', date: '2026-06-08', submitDate: '2026-06-09',
     category: '宿泊費', payee: 'ホテルグランヴィア大阪', amount: 12000,
     memo: '大阪出張 1泊', extra: { destination: '大阪', nights: '1泊' },
-    status: 'finance_processing', receiptData: RECEIPT_IMGS.receipt_hotel, receiptName: '領収書_ホテルグランヴィア_20260609.svg',
-    settledDate: '2026-07-25',
+    status: 'completed', settlement: 'unsettled',
+    receiptData: RECEIPT_IMGS.receipt_hotel, receiptName: '領収書_ホテルグランヴィア_20260609.svg',
     history: [
-      { action: 'submitted',       who: '田中 太郎', at: '2026-06-09T10:00:00', note: '' },
+      { action: 'submitted',        who: '田中 太郎', at: '2026-06-09T10:00:00', note: '' },
       { action: 'manager_approved', who: '山田 健一', at: '2026-06-10T09:30:00', note: '' },
       { action: 'finance_approved', who: '中村 さき', at: '2026-06-12T10:00:00', note: '' },
     ],
   },
-  // ── finance_pending (経理処理待ち) ──
   {
     id: 12, submitterId: 'sato', date: '2026-06-16', submitDate: '2026-06-17',
     category: '交通費', payee: '東海道新幹線', amount: 13640,
     memo: '名古屋出張 往復', extra: { route: '東京→名古屋（新幹線）' },
-    status: 'finance_pending', receiptMock: true,
-    settledDate: '2026-07-25',
+    status: 'completed', settlement: 'unsettled', receiptMock: true,
     history: [
-      { action: 'submitted',       who: '佐藤 花子', at: '2026-06-17T09:00:00', note: '' },
+      { action: 'submitted',        who: '佐藤 花子', at: '2026-06-17T09:00:00', note: '' },
       { action: 'manager_approved', who: '山田 健一', at: '2026-06-18T10:30:00', note: '' },
       { action: 'finance_approved', who: '中村 さき', at: '2026-06-20T09:00:00', note: '' },
     ],
@@ -219,23 +227,21 @@ const DUMMY = [
     id: 13, submitterId: 'suzuki', date: '2026-06-13', submitDate: '2026-06-13',
     category: '消耗品費', payee: 'Amazon', amount: 4800,
     memo: 'オフィス用コピー用紙（A4 500枚×5冊）', extra: {},
-    status: 'finance_pending', receiptMock: true,
-    settledDate: '2026-07-25',
+    status: 'completed', settlement: 'unsettled', receiptMock: true,
     history: [
-      { action: 'submitted',       who: '鈴木 次郎', at: '2026-06-13T12:00:00', note: '' },
+      { action: 'submitted',        who: '鈴木 次郎', at: '2026-06-13T12:00:00', note: '' },
       { action: 'manager_approved', who: '山田 健一', at: '2026-06-14T10:00:00', note: '' },
       { action: 'finance_approved', who: '中村 さき', at: '2026-06-16T09:30:00', note: '' },
     ],
   },
-  // ── manager_approved (上長承認済み・経理待ち) ──
+  // ── approved (経理承認待ち) ──
   {
     id: 14, submitterId: 'tanaka', date: '2026-06-20', submitDate: '2026-06-20',
     category: '会議費', payee: 'コメダ珈琲', amount: 3800,
     memo: '新規顧客との初回ミーティング', extra: { attendees: '田中、新規顧客 松本様 2名', purpose: '新規受注可能性ヒアリング' },
-    status: 'manager_approved', receiptData: RECEIPT_IMGS.receipt_komeda, receiptName: '領収書_コメダ珈琲_20260620.svg',
-    settledDate: null,
+    status: 'approved', receiptData: RECEIPT_IMGS.receipt_komeda, receiptName: '領収書_コメダ珈琲_20260620.svg',
     history: [
-      { action: 'submitted',       who: '田中 太郎', at: '2026-06-20T19:00:00', note: '' },
+      { action: 'submitted',        who: '田中 太郎', at: '2026-06-20T19:00:00', note: '' },
       { action: 'manager_approved', who: '山田 健一', at: '2026-06-21T11:00:00', note: '' },
     ],
   },
@@ -243,10 +249,9 @@ const DUMMY = [
     id: 15, submitterId: 'sato', date: '2026-06-22', submitDate: '2026-06-23',
     category: '宿泊費', payee: 'ANAクラウンプラザホテル福岡', amount: 15000,
     memo: '福岡出張 1泊', extra: { destination: '福岡', nights: '1泊' },
-    status: 'manager_approved', receiptMock: true,
-    settledDate: null,
+    status: 'approved', receiptMock: true,
     history: [
-      { action: 'submitted',       who: '佐藤 花子', at: '2026-06-23T10:00:00', note: '' },
+      { action: 'submitted',        who: '佐藤 花子', at: '2026-06-23T10:00:00', note: '' },
       { action: 'manager_approved', who: '山田 健一', at: '2026-06-24T09:30:00', note: '' },
     ],
   },
@@ -256,84 +261,64 @@ const DUMMY = [
     category: '接待費', payee: '銀座 ○○', amount: 28000,
     memo: 'A社担当者との関係構築', extra: { client: 'A株式会社 営業部 3名', attendees: '5名（社内2名、先方3名）' },
     status: 'pending', receiptMock: true,
-    settledDate: null,
-    history: [
-      { action: 'submitted', who: '佐藤 花子', at: '2026-06-10T22:00:00', note: '' },
-    ],
+    history: [{ action: 'submitted', who: '佐藤 花子', at: '2026-06-10T22:00:00', note: '' }],
   },
   {
     id: 17, submitterId: 'tanaka', date: '2026-06-11', submitDate: '2026-06-11',
     category: '交通費', payee: '東京メトロ', amount: 540,
     memo: '訪問営業 往復', extra: { route: '渋谷→新宿（往復）' },
     status: 'pending', receiptMock: false,
-    settledDate: null,
-    history: [
-      { action: 'submitted', who: '田中 太郎', at: '2026-06-11T18:30:00', note: '' },
-    ],
+    history: [{ action: 'submitted', who: '田中 太郎', at: '2026-06-11T18:30:00', note: '' }],
   },
   {
     id: 18, submitterId: 'tanaka', date: '2026-06-24', submitDate: '2026-06-24',
     category: '交通費', payee: 'タクシー（深夜）', amount: 3200,
     memo: '深夜残業後の帰宅タクシー', extra: { route: 'オフィス→自宅（深夜22時以降）' },
     status: 'pending', receiptMock: false,
-    settledDate: null,
-    history: [
-      { action: 'submitted', who: '田中 太郎', at: '2026-06-24T23:10:00', note: '' },
-    ],
+    history: [{ action: 'submitted', who: '田中 太郎', at: '2026-06-24T23:10:00', note: '' }],
   },
   {
     id: 19, submitterId: 'suzuki', date: '2026-06-24', submitDate: '2026-06-24',
     category: '通信費', payee: 'ソフトバンク', amount: 6600,
     memo: '6月分 業務用携帯電話料金', extra: {},
     status: 'pending', receiptMock: false,
-    settledDate: null,
-    history: [
-      { action: 'submitted', who: '鈴木 次郎', at: '2026-06-24T09:00:00', note: '' },
-    ],
+    history: [{ action: 'submitted', who: '鈴木 次郎', at: '2026-06-24T09:00:00', note: '' }],
   },
   {
     id: 20, submitterId: 'tanaka', date: '2026-06-25', submitDate: '2026-06-25',
     category: 'その他', payee: '〇〇書店', amount: 3200,
     memo: 'PM研修テキスト 2冊', extra: {},
     status: 'pending', receiptMock: false,
-    settledDate: null,
-    history: [
-      { action: 'submitted', who: '田中 太郎', at: '2026-06-25T12:00:00', note: '' },
-    ],
+    history: [{ action: 'submitted', who: '田中 太郎', at: '2026-06-25T12:00:00', note: '' }],
   },
-  // ── rejected (1件目: 上長による差し戻し) ──
+  // ── rejected ──
   {
     id: 21, submitterId: 'tanaka', date: '2026-06-14', submitDate: '2026-06-14',
     category: '通信費', payee: 'ソフトバンク', amount: 6600,
     memo: '6月分 携帯電話費用', extra: {},
     status: 'rejected', receiptMock: false,
-    settledDate: null,
     history: [
       { action: 'submitted', who: '田中 太郎', at: '2026-06-14T10:00:00', note: '' },
       { action: 'rejected',  who: '山田 健一', at: '2026-06-15T09:00:00', note: '領収書の添付が必要です。再申請時は必ずPDFを添付してください。' },
     ],
   },
-  // ── 差し戻し→再申請シナリオ ──
-  // 22: 経理で差し戻された元申請（佐藤）
   {
     id: 22, submitterId: 'sato', date: '2026-06-10', submitDate: '2026-06-11',
     category: '接待費', payee: '赤坂 ××', amount: 48000,
     memo: 'D社担当者との関係強化（接待）', extra: { client: 'D株式会社 営業部長 村上様', attendees: '5名（社内2名、先方3名）' },
     status: 'rejected', receiptMock: false,
-    settledDate: null,
     history: [
       { action: 'submitted',        who: '佐藤 花子', at: '2026-06-11T09:30:00', note: '' },
       { action: 'manager_approved', who: '山田 健一', at: '2026-06-12T10:15:00', note: '' },
       { action: 'rejected',         who: '中村 さき', at: '2026-06-13T11:40:00', note: '領収書の合計金額（¥45,000）と申請額（¥48,000）が一致していません。差額¥3,000の内訳を確認し、正しい金額で再申請してください。' },
     ],
   },
-  // 23: 再申請版（修正して領収書を添付し再提出）
+  // ── 再申請版 ──
   {
     id: 23, submitterId: 'sato', date: '2026-06-10', submitDate: '2026-06-14',
     category: '接待費', payee: '赤坂 ××', amount: 45000,
     memo: '【再申請】D社担当者との関係強化（接待）※6/13差し戻し分', extra: { client: 'D株式会社 営業部長 村上様', attendees: '5名（社内2名、先方3名）' },
-    status: 'manager_approved', receiptMock: true,
-    settledDate: null,
+    status: 'approved', receiptMock: true,
     history: [
       { action: 'submitted',        who: '佐藤 花子', at: '2026-06-14T14:20:00', note: '金額を修正しました（¥48,000→¥45,000）。領収書を添付しています。' },
       { action: 'manager_approved', who: '山田 健一', at: '2026-06-15T09:30:00', note: '再確認済み。経理へ回します。' },
@@ -342,7 +327,7 @@ const DUMMY = [
 ];
 
 // ── State ────────────────────────────────────────────────────────────────────
-const DATA_VERSION = '7';  // increment when DUMMY data structure changes
+const DATA_VERSION = '8';  // increment when DUMMY data structure changes
 if (localStorage.getItem('ef_data_version') !== DATA_VERSION) {
   localStorage.removeItem('ef_expenses');
   localStorage.setItem('ef_data_version', DATA_VERSION);
@@ -505,8 +490,8 @@ function renderDashboard() {
       </div>
       <div class="action-card ok">
         <div class="action-card-label">今月の承認完了</div>
-        <div class="action-card-value">${allMonth.filter(e=>['manager_approved','finance_pending','finance_processing','settled'].includes(e.status)).length}件</div>
-        <div class="action-card-sub">${fmt(allMonth.filter(e=>['manager_approved','finance_pending','finance_processing','settled'].includes(e.status)).reduce((s,e)=>s+e.amount,0))}</div>
+        <div class="action-card-value">${allMonth.filter(e=>['approved','completed'].includes(e.status)).length}件</div>
+        <div class="action-card-sub">${fmt(allMonth.filter(e=>['approved','completed'].includes(e.status)).reduce((s,e)=>s+e.amount,0))}</div>
       </div>
     `;
   } else {
@@ -517,8 +502,8 @@ function renderDashboard() {
   const statsGrid = document.getElementById('statsGrid');
   if (role === 'employee') {
     const myAll = expenses.filter(e => e.submitterId === currentUserId);
-    const myPending  = myAll.filter(e => ['pending','manager_approved'].includes(e.status));
-    const myApproved = myAll.filter(e => ['finance_pending','finance_processing','settled'].includes(e.status));
+    const myPending  = myAll.filter(e => ['pending','approved'].includes(e.status));
+    const myApproved = myAll.filter(e => e.status === 'completed');
     const myRejected = myAll.filter(e => e.status === 'rejected');
     statsGrid.innerHTML = `
       <div class="stat-card">
@@ -545,8 +530,8 @@ function renderDashboard() {
   } else {
     // manager
     const pending  = allMonth.filter(e => e.status === 'pending');
-    const approved = allMonth.filter(e => ['manager_approved','finance_pending','finance_processing','settled'].includes(e.status));
-    const settled  = allMonth.filter(e => e.status === 'settled');
+    const approved = allMonth.filter(e => ['approved','completed'].includes(e.status));
+    const settled  = allMonth.filter(e => e.status === 'completed' && e.settlement === 'settled');
     statsGrid.innerHTML = `
       <div class="stat-card">
         <div class="stat-label">今月の申請合計</div>
@@ -658,58 +643,40 @@ function renderFinanceDashboard(y, m, allMonth) {
   document.getElementById('financeQueue').classList.remove('hidden');
   document.getElementById('recentCard').classList.remove('hidden');
 
-  // 5 summary cards
-  const waitFinance  = expenses.filter(e => e.status === 'manager_approved');
-  const finApproved  = expenses.filter(e => e.status === 'finance_pending');
-  const processing   = expenses.filter(e => e.status === 'finance_processing');
-  const rejectedAll  = expenses.filter(e => e.status === 'rejected');
-  const settledMonth = allMonth.filter(e => e.status === 'settled');
-  const scheduledAmt = finApproved.reduce((s,e)=>s+e.amount,0) + processing.reduce((s,e)=>s+e.amount,0);
-
-  // 「今日の対応」= 3日以上滞留している未処理案件（期限超過）
-  const threeDaysAgo = Date.now() - 3 * 24 * 60 * 60 * 1000;
-  const overdueItems = [...waitFinance, ...finApproved, ...processing].filter(e => {
-    const lastAction = e.history.at(-1);
-    return lastAction && new Date(lastAction.at).getTime() < threeDaysAgo;
-  });
+  // 4 summary cards (シンプル化)
+  const waitApproval  = expenses.filter(e => e.status === 'approved');   // 経理承認待ち
+  const rejectedAll   = expenses.filter(e => e.status === 'rejected');
+  const unsettledMonth = allMonth.filter(e => e.status === 'completed' && e.settlement === 'unsettled');
+  const settledMonth   = allMonth.filter(e => e.status === 'completed' && e.settlement === 'settled');
 
   const alerts = document.getElementById('actionAlerts');
   alerts.classList.remove('hidden');
-  alerts.className = 'action-alerts five-col';
+  alerts.className = 'action-alerts';
   alerts.innerHTML = `
     <div class="action-card urgent">
-      <div class="action-card-label">経理確認待ち</div>
-      <div class="action-card-value">${waitFinance.length}件</div>
-      <div class="action-card-sub">${fmt(waitFinance.reduce((s,e)=>s+e.amount,0))}</div>
+      <div class="action-card-label">承認待ち</div>
+      <div class="action-card-value">${waitApproval.length}件</div>
+      <div class="action-card-sub">${fmt(waitApproval.reduce((s,e)=>s+e.amount,0))}</div>
     </div>
     <div class="action-card warn">
-      <div class="action-card-label">今日の対応<span class="action-card-badge-hint">期限超過</span></div>
-      <div class="action-card-value">${overdueItems.length}件</div>
-      <div class="action-card-sub">3日以上滞留中</div>
-    </div>
-    <div class="action-card">
-      <div class="action-card-label">差し戻し中</div>
+      <div class="action-card-label">差し戻し</div>
       <div class="action-card-value">${rejectedAll.length}件</div>
       <div class="action-card-sub">再申請待ち</div>
     </div>
     <div class="action-card" style="border-top-color:var(--purple)">
-      <div class="action-card-label">今月精算予定</div>
-      <div class="action-card-value" style="font-size:19px">${fmt(scheduledAmt)}</div>
-      <div class="action-card-sub">${finApproved.length + processing.length}件</div>
+      <div class="action-card-label">今月 精算予定（未精算）</div>
+      <div class="action-card-value" style="font-size:19px">${fmt(unsettledMonth.reduce((s,e)=>s+e.amount,0))}</div>
+      <div class="action-card-sub">${unsettledMonth.length}件</div>
     </div>
     <div class="action-card ok">
-      <div class="action-card-label">今月処理済み</div>
-      <div class="action-card-value">${settledMonth.length}件</div>
-      <div class="action-card-sub">${fmt(settledMonth.reduce((s,e)=>s+e.amount,0))}</div>
+      <div class="action-card-label">今月 精算済み</div>
+      <div class="action-card-value">${fmt(settledMonth.reduce((s,e)=>s+e.amount,0))}</div>
+      <div class="action-card-sub">${settledMonth.length}件</div>
     </div>
   `;
 
-  // 処理キュー (今やるべき申請リスト)
-  const queue = [
-    ...expenses.filter(e => e.status === 'manager_approved'),
-    ...expenses.filter(e => e.status === 'finance_pending'),
-    ...expenses.filter(e => e.status === 'finance_processing'),
-  ];
+  // 経理承認待ちキュー
+  const queue = expenses.filter(e => e.status === 'approved');
 
   const queueHtml = queue.length ? `
     <div class="fq-section">
@@ -739,14 +706,10 @@ function renderFinanceDashboard(y, m, allMonth) {
                 : `<span class="tbl-receipt-none">なし</span>`;
 
             let actionBtn = '';
-            if (e.status === 'manager_approved') {
+            if (e.status === 'approved') {
               actionBtn = `
-                <button class="btn-success fq-btn" onclick="event.stopPropagation();fqApprove(${e.id})">経理承認</button>
+                <button class="btn-success fq-btn" onclick="event.stopPropagation();approveExpense(${e.id})">経理承認 → 完了</button>
                 <button class="btn-danger fq-btn"  onclick="event.stopPropagation();openRejectModal(${e.id})">差戻し</button>`;
-            } else if (e.status === 'finance_pending') {
-              actionBtn = `<button class="btn-warn fq-btn" onclick="event.stopPropagation();fqProcess(${e.id})">精算処理へ</button>`;
-            } else if (e.status === 'finance_processing') {
-              actionBtn = `<button class="btn-success fq-btn" onclick="event.stopPropagation();fqSettle(${e.id})">精算済みに</button>`;
             }
 
             return `
@@ -788,13 +751,13 @@ function renderFinanceDashboard(y, m, allMonth) {
     </tr>`;
 
   const recentSettled = expenses
-    .filter(e => e.status === 'settled')
+    .filter(e => e.status === 'completed' && e.settlement === 'settled')
     .sort((a,b) => b.submitDate.localeCompare(a.submitDate))
     .slice(0, 6);
 
   document.getElementById('recentTableBody').innerHTML = recentSettled.length
     ? recentSettled.map(e => {
-        const settledEntry = e.history.find(h => h.action === 'settled');
+        const settledEntry = e.history.find(h => h.action === 'finance_approved' || h.action === 'settled');
         return `
           <tr onclick="openDetail(${e.id})">
             <td>${formatDate(e.submitDate)}</td>
@@ -832,33 +795,7 @@ function renderFinanceDashboard(y, m, allMonth) {
   });
 }
 
-// Finance queue inline actions (dashboard)
-function fqApprove(id) {
-  const e = expenses.find(x => x.id === id);
-  if (!e) return;
-  e.status = 'finance_pending';
-  e.history.push({ action: 'finance_approved', who: me().name, at: new Date().toISOString(), note: '' });
-  e.settledDate = '2026-07-25';
-  save(); renderDashboard(); updateBadge();
-  showToast('経理承認しました ✓', 'success');
-}
-function fqProcess(id) {
-  const e = expenses.find(x => x.id === id);
-  if (!e) return;
-  e.status = 'finance_processing';
-  e.history.push({ action: 'processing', who: me().name, at: new Date().toISOString(), note: '精算処理開始' });
-  save(); renderDashboard(); updateBadge();
-  showToast('精算処理へ移行しました ✓', 'success');
-}
-function fqSettle(id) {
-  const e = expenses.find(x => x.id === id);
-  if (!e) return;
-  e.status = 'settled';
-  e.settledDate = new Date().toISOString().slice(0,10);
-  e.history.push({ action: 'settled', who: me().name, at: new Date().toISOString(), note: '振込完了' });
-  save(); renderDashboard(); updateBadge();
-  showToast('精算済みにしました ✓', 'success');
-}
+// (fqApprove/fqProcess/fqSettle removed — finance dashboard now uses approveExpense() and openRejectModal())
 
 document.getElementById('prevMonth').addEventListener('click', () => {
   currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1);
@@ -990,11 +927,11 @@ function renderApproval() {
   if (role === 'manager') {
     document.getElementById('approvalTitle').textContent = '承認管理（上長）';
     pendingItems = expenses.filter(e => e.status === 'pending');
-    doneItems    = expenses.filter(e => ['manager_approved','finance_pending','finance_processing','settled','rejected'].includes(e.status));
+    doneItems    = expenses.filter(e => ['approved','completed','rejected'].includes(e.status));
   } else {
     document.getElementById('approvalTitle').textContent = '承認管理（経理）';
-    pendingItems = expenses.filter(e => e.status === 'manager_approved');
-    doneItems    = expenses.filter(e => ['finance_pending','finance_processing','settled'].includes(e.status));
+    pendingItems = expenses.filter(e => e.status === 'approved');
+    doneItems    = expenses.filter(e => e.status === 'completed');
   }
 
   const badge = document.getElementById('pendingCountBadge');
@@ -1035,14 +972,10 @@ function renderApprovalCards(list, showActions, role) {
     // Finance action buttons
     let financeActions = '';
     if (role === 'finance') {
-      if (showActions && e.status === 'manager_approved') {
+      if (showActions && e.status === 'approved') {
         financeActions = `
-          <button class="btn-success" onclick="approveExpense(${e.id})">経理承認</button>
+          <button class="btn-success" onclick="approveExpense(${e.id})">経理承認 → 承認完了</button>
           <button class="btn-danger"  onclick="openRejectModal(${e.id})">差し戻し</button>`;
-      } else if (e.status === 'finance_pending') {
-        financeActions = `<button class="btn-warn" onclick="markProcessing(${e.id})">精算処理へ</button>`;
-      } else if (e.status === 'finance_processing') {
-        financeActions = `<button class="btn-success" onclick="markSettled(${e.id})">精算済みにする</button>`;
       }
     } else if (showActions) {
       financeActions = `
@@ -1086,38 +1019,18 @@ function approveExpense(id) {
   const role = me().role;
 
   if (role === 'manager') {
-    e.status = 'manager_approved';
+    // 上長承認待ち → 経理承認待ち
+    e.status = 'approved';
     e.history.push({ action: 'manager_approved', who: me().name, at: new Date().toISOString(), note: '' });
     showToast('上長承認しました ✓', 'success');
   } else {
-    // finance: 経理確認待ち → 経理承認済み
-    e.status = 'finance_pending';
+    // 経理承認待ち → 承認完了（精算は別途）
+    e.status = 'completed';
+    e.settlement = 'unsettled';
     e.history.push({ action: 'finance_approved', who: me().name, at: new Date().toISOString(), note: '' });
-    e.settledDate = '2026-07-25';
-    showToast('経理承認しました → 精算処理待ちへ ✓', 'success');
+    showToast('経理承認しました → 承認完了 ✓', 'success');
   }
   save(); renderApproval(); updateBadge();
-}
-
-function markProcessing(id) {
-  const e = expenses.find(x => x.id === id);
-  if (!e) return;
-  // 経理承認済み → 精算処理待ち
-  e.status = 'finance_processing';
-  e.history.push({ action: 'processing', who: me().name, at: new Date().toISOString(), note: '精算処理開始' });
-  save(); renderApproval(); updateBadge();
-  showToast('精算処理へ移行しました ✓', 'success');
-}
-
-function markSettled(id) {
-  const e = expenses.find(x => x.id === id);
-  if (!e) return;
-  // 精算処理待ち → 精算済み
-  e.status = 'settled';
-  e.settledDate = new Date().toISOString().slice(0,10);
-  e.history.push({ action: 'settled', who: me().name, at: new Date().toISOString(), note: '振込完了' });
-  save(); renderApproval(); updateBadge();
-  showToast('精算済みにしました ✓', 'success');
 }
 
 function openRejectModal(id) {
@@ -1216,8 +1129,8 @@ function renderExpList() {
   const usrFil = document.getElementById('elUser').value;
   const catFil = document.getElementById('elCategory').value;
 
-  const APPROVED_STATUSES = ['manager_approved','finance_pending','finance_processing','settled'];
-  let filtered = expenses.filter(e => APPROVED_STATUSES.includes(e.status));
+  // 経費精算リストは「承認完了」のみ表示（精算対象のみ）
+  let filtered = expenses.filter(e => e.status === 'completed');
   if (monFil !== 'all') filtered = filtered.filter(e => monthKey(e.submitDate) === monFil);
   if (usrFil !== 'all') filtered = filtered.filter(e => e.submitterId === usrFil);
   if (catFil !== 'all') filtered = filtered.filter(e => e.category === catFil);
@@ -1290,14 +1203,25 @@ function renderExpList() {
             <td class="el-td-memo">${e.memo}</td>
             <td class="el-td-payee">${e.payee}${detail ? `<div class="el-td-detail">${detail}</div>` : ''}</td>
             <td class="el-td-amount amount">${fmt(e.amount)}</td>
-            <td class="el-td-status">${statusBadge(e.status)}</td>
+            <td class="el-td-status">${settlementBadge(e)}</td>
             <td class="el-td-receipt">${receiptBtn}</td>
             <td class="el-td-action" onclick="event.stopPropagation()">
-              ${elActionBtn(e)}
               <button class="el-detail-btn" onclick="openDetail(${e.id})">詳細</button>
             </td>
           </tr>`;
       }).join('');
+
+      // 振込額 = 未精算の合計（精算対象）
+      const unsettledAmt = items.filter(e => e.settlement !== 'settled').reduce((s, e) => s + e.amount, 0);
+      const unsettledCnt = items.filter(e => e.settlement !== 'settled').length;
+      const settledCnt   = items.filter(e => e.settlement === 'settled').length;
+
+      const personSettleBtn = (me().role === 'finance' && unsettledCnt > 0)
+        ? `<button class="el-settle-btn" onclick="event.stopPropagation();elSettlePerson('${mk}','${uid}')">社員一括精算（${unsettledCnt}件）</button>`
+        : '';
+      const personTotalLabel = unsettledCnt > 0
+        ? `<span class="el-person-total">振込額 ${fmt(unsettledAmt)}</span><span class="el-settled-hint">（精算済 ${settledCnt}件）</span>`
+        : `<span class="el-person-total el-all-settled">✓ 精算済み ${fmt(personTotal)}</span>`;
 
       return `
         <div class="el-person-section">
@@ -1306,14 +1230,15 @@ function renderExpList() {
             <div class="el-avatar-sm" style="background:${u?.color || '#9CA3AF'}">${u?.initial || '?'}</div>
             <span class="el-person-name">${u?.name || uid}</span>
             <span class="el-person-dept">${u?.dept || ''}</span>
-            <span class="el-person-total">${fmt(personTotal)}</span>
+            ${personTotalLabel}
+            ${personSettleBtn}
           </div>
           <div class="el-person-body">
             <table class="el-table">
               <thead>
                 <tr>
                   <th>カテゴリ</th><th>利用日</th><th>件名</th>
-                  <th>支払先 / 経路</th><th>金額</th><th>ステータス</th><th>領収書</th><th>操作</th>
+                  <th>支払先 / 経路</th><th>金額</th><th>精算状況</th><th>領収書</th><th>操作</th>
                 </tr>
               </thead>
               <tbody>${rowsHtml}</tbody>
@@ -1322,31 +1247,32 @@ function renderExpList() {
         </div>`;
     }).join('');
 
+    const allMonthItems = Object.values(byMonth[mk]).flat();
+    const monthUnsettledCnt = allMonthItems.filter(e => e.settlement !== 'settled').length;
+    const monthUnsettledAmt = allMonthItems.filter(e => e.settlement !== 'settled').reduce((s, e) => s + e.amount, 0);
+
+    // 「未承認」件数（今月で completed 以外）
+    const unapprovedCnt = expenses.filter(e => monthKey(e.date) === mk && e.status !== 'completed').length;
+    const unapprovedNotice = unapprovedCnt > 0
+      ? `<span class="el-unapproved-hint">未承認: ${unapprovedCnt}件（非表示）</span>`
+      : '';
+
+    const monthSettleBtn = (me().role === 'finance' && monthUnsettledCnt > 0)
+      ? `<button class="el-settle-btn el-month-settle-btn" onclick="event.stopPropagation();elSettleMonth('${mk}')">月一括精算（${monthUnsettledCnt}件 ${fmt(monthUnsettledAmt)}）</button>`
+      : '';
+
     return `
       <div class="el-month-section">
         <div class="el-month-header" onclick="elToggleMonth(this)">
           <span class="el-toggle-icon">▼</span>
           ${monthLabel}
           <span class="el-month-total">${fmt(monthTotal)}</span>
+          ${unapprovedNotice}
+          ${monthSettleBtn}
         </div>
         <div class="el-month-body">${personsHtml}</div>
       </div>`;
   }).join('');
-}
-
-function elActionBtn(e) {
-  const role = me().role;
-  if (role === 'finance') {
-    if (e.status === 'manager_approved')
-      return `<button class="el-act-btn el-act-approve" onclick="event.stopPropagation();elApprove(${e.id})">経理承認</button>`;
-    if (e.status === 'finance_pending')
-      return `<button class="el-act-btn el-act-process" onclick="event.stopPropagation();elProcess(${e.id})">処理へ</button>`;
-    if (e.status === 'finance_processing')
-      return `<button class="el-act-btn el-act-settle" onclick="event.stopPropagation();elSettle(${e.id})">精算済に</button>`;
-  }
-  if (role === 'manager' && e.status === 'pending')
-    return `<button class="el-act-btn el-act-approve" onclick="event.stopPropagation();elManagerApprove(${e.id})">承認</button>`;
-  return '';
 }
 
 // toggle collapse
@@ -1365,40 +1291,39 @@ function elTogglePerson(header) {
   icon.textContent = collapsed ? '▼' : '▶';
 }
 
-// el inline action handlers
-function elApprove(id) {
-  const e = expenses.find(x => x.id === id);
-  if (!e) return;
-  e.status = 'finance_pending';
-  e.history.push({ action: 'finance_approved', who: me().name, at: new Date().toISOString(), note: '' });
-  e.settledDate = '2026-07-25';
-  save(); renderExpList(); updateBadge();
-  showToast('経理承認しました ✓', 'success');
+// 月一括精算
+function elSettleMonth(mk) {
+  const targets = expenses.filter(e =>
+    monthKey(e.date) === mk && e.status === 'completed' && e.settlement !== 'settled'
+  );
+  if (!targets.length) return;
+  const now = new Date().toISOString();
+  const today = now.slice(0, 10);
+  targets.forEach(e => {
+    e.settlement = 'settled';
+    e.settledDate = today;
+    e.history.push({ action: 'settled', who: me().name, at: now, note: '月一括精算' });
+  });
+  save(); renderExpList();
+  showToast(`${targets.length}件を精算済みにしました ✓`, 'success');
 }
-function elProcess(id) {
-  const e = expenses.find(x => x.id === id);
-  if (!e) return;
-  e.status = 'finance_processing';
-  e.history.push({ action: 'processing', who: me().name, at: new Date().toISOString(), note: '精算処理開始' });
-  save(); renderExpList(); updateBadge();
-  showToast('精算処理へ移行しました ✓', 'success');
-}
-function elSettle(id) {
-  const e = expenses.find(x => x.id === id);
-  if (!e) return;
-  e.status = 'settled';
-  e.settledDate = new Date().toISOString().slice(0,10);
-  e.history.push({ action: 'settled', who: me().name, at: new Date().toISOString(), note: '振込完了' });
-  save(); renderExpList(); updateBadge();
-  showToast('精算済みにしました ✓', 'success');
-}
-function elManagerApprove(id) {
-  const e = expenses.find(x => x.id === id);
-  if (!e) return;
-  e.status = 'manager_approved';
-  e.history.push({ action: 'manager_approved', who: me().name, at: new Date().toISOString(), note: '' });
-  save(); renderExpList(); updateBadge();
-  showToast('上長承認しました ✓', 'success');
+
+// 社員一括精算
+function elSettlePerson(mk, uid) {
+  const targets = expenses.filter(e =>
+    monthKey(e.date) === mk && e.submitterId === uid &&
+    e.status === 'completed' && e.settlement !== 'settled'
+  );
+  if (!targets.length) return;
+  const now = new Date().toISOString();
+  const today = now.slice(0, 10);
+  targets.forEach(e => {
+    e.settlement = 'settled';
+    e.settledDate = today;
+    e.history.push({ action: 'settled', who: me().name, at: now, note: '社員一括精算' });
+  });
+  save(); renderExpList();
+  showToast(`${targets.length}件を精算済みにしました ✓`, 'success');
 }
 
 // Wire up filters for explist
@@ -1583,14 +1508,12 @@ function openDetail(id) {
 
   // Finance status pipeline
   const PIPELINE = [
-    { key: 'pending',              label: '申請',        tip: '申請者が経費を申請した状態。上長の確認待ちです。' },
-    { key: 'manager_approved',     label: '上長承認',    tip: '上長が内容を確認・承認しました。経理担当の確認待ちです。' },
-    { key: 'finance_pending',      label: '経理確認済み', tip: '経理担当が内容を確認・承認しました。振込・給与反映の処理待ちです。' },
-    { key: 'finance_processing',   label: '精算処理中',  tip: '振込または給与反映の処理を開始しています。支払完了まで少しお待ちください。' },
-    { key: 'settled',              label: '精算済み',    tip: '支払が完了しました。振込または給与への加算が実行されています。' },
+    { key: 'pending',   label: '申請',      tip: '申請者が経費を申請した状態。上長の確認待ちです。' },
+    { key: 'approved',  label: '上長承認',  tip: '上長が内容を確認・承認しました。経理担当の確認待ちです。' },
+    { key: 'completed', label: '承認完了',  tip: '経理が承認しました。精算（振込）処理の対象になります。' },
   ];
-  const ORDER = ['pending','manager_approved','finance_pending','finance_processing','settled'];
-  const curIdx = ORDER.indexOf(e.status);
+  const ORDER = ['pending','approved','completed'];
+  const curIdx = e.status === 'rejected' ? -1 : ORDER.indexOf(e.status);
   const financeHtml = `
     <div class="finance-pipeline">
       <div class="finance-pipeline-label">経理処理フロー</div>
@@ -1653,11 +1576,9 @@ function openDetail(id) {
 
   // Pending steps
   const nextSteps = [];
-  if (!['settled','rejected'].includes(e.status)) {
-    if (e.status === 'pending')            nextSteps.push('manager_approved','finance_approved','processing','settled');
-    else if (e.status === 'manager_approved') nextSteps.push('finance_approved','processing','settled');
-    else if (e.status === 'finance_pending')  nextSteps.push('processing','settled');
-    else if (e.status === 'finance_processing') nextSteps.push('settled');
+  if (!['completed','rejected'].includes(e.status)) {
+    if (e.status === 'pending')   nextSteps.push('manager_approved','finance_approved');
+    else if (e.status === 'approved') nextSteps.push('finance_approved');
   }
 
   // Show current waiting line
@@ -1784,7 +1705,7 @@ function updateBadge() {
   const role = me().role;
   let n = 0;
   if (role === 'manager') n = expenses.filter(e => e.status === 'pending').length;
-  if (role === 'finance') n = expenses.filter(e => e.status === 'manager_approved').length;
+  if (role === 'finance') n = expenses.filter(e => e.status === 'approved').length;
   const badge = document.getElementById('pendingBadge');
   badge.textContent = n;
   badge.classList.toggle('visible', n > 0);

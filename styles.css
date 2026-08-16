@@ -1086,6 +1086,31 @@ textarea { resize: vertical; }
 .el-person-name { font-weight: 600; color: var(--gray-900); }
 .el-person-dept { font-size: 12px; color: var(--gray-400); font-weight: 400; }
 .el-person-total { margin-left: auto; font-size: 14px; font-weight: 700; color: var(--gray-900); }
+.el-person-total.el-all-settled { color: var(--success); }
+.el-settled-hint { font-size: 11px; color: var(--gray-400); margin-left: 6px; }
+.el-unapproved-hint { font-size: 11px; color: var(--warning); background: var(--warning-light); border-radius: 4px; padding: 2px 8px; margin-left: 8px; }
+
+/* 精算バッジ */
+.settlement-badge { display: inline-block; border-radius: 4px; padding: 2px 8px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.settlement-unsettled { background: #FFF7ED; color: #C2410C; border: 1px solid #FDBA74; }
+.settlement-settled   { background: var(--success-light); color: var(--success); border: 1px solid #6EE7B7; }
+
+/* 一括精算ボタン */
+.el-settle-btn {
+  margin-left: 10px;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--success);
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .15s;
+}
+.el-settle-btn:hover { background: #047857; }
+.el-month-settle-btn { font-size: 12px; padding: 5px 14px; }
 
 /* table inside person */
 .el-person-body { background: white; }
